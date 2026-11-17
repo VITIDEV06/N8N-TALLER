@@ -1,0 +1,2 @@
+id,fecha,fuente,categoria,titulo,resumen,puntos_clave,etiquetas,modelo,estado,texto_original
+K-DEMO01,2026-11-17 10:00,ejemplo,estudio,Expresiones en n8n,Las expresiones permiten usar datos dinámicos en los parámetros de los nodos.,Se escriben entre dobles llaves | Usan JavaScript | $json es el item actual,"n8n, expresiones",simulado,ok,Texto de ejemplo ficticio sobre expresiones en n8n.

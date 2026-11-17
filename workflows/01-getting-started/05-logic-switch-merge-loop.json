@@ -1,0 +1,390 @@
+{
+  "name": "05 - Switch, Merge y Loop Over Items",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 05 - Switch, Merge y Loop Over Items\n1. **Code** genera 6 tareas ficticias.\n2. **Switch** las envía por una salida según su prioridad.\n3. Cada rama asigna un plazo recomendado (**Edit Fields**).\n4. **Merge** (3 entradas) las vuelve a unir.\n5. **Loop Over Items** las procesa en lotes de 2.\n6. **Code** final resume el resultado.",
+        "height": 300,
+        "width": 560
+      },
+      "id": "6b0072f3-8d8c-5e69-a01a-58c5741389d5",
+      "name": "Nota 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -360
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "5042eb76-d17e-54f6-bc29-7b1e67dbed28",
+      "name": "Ejecutar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Datos ficticios: una lista de tareas con distintas prioridades.\nconst tareas = [\n  { titulo: 'Preparar presentación trimestral', prioridad: 'alta' },\n  { titulo: 'Responder correo del proveedor', prioridad: 'media' },\n  { titulo: 'Ordenar escritorio', prioridad: 'baja' },\n  { titulo: 'Pagar factura de internet', prioridad: 'alta' },\n  { titulo: 'Leer capítulo 3 del libro', prioridad: 'baja' },\n  { titulo: 'Planificar menú semanal', prioridad: 'media' },\n];\nreturn tareas.map((t) => ({ json: t }));"
+      },
+      "id": "b4fa832a-d7da-5994-8773-538fca8d6c92",
+      "name": "Tareas de ejemplo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "dc9426a4-17ad-54f8-b673-ada056f1aa18",
+                    "leftValue": "={{ $json.prioridad }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "alta"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "alta"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "31ff1a1a-0766-5e49-b409-2a24ec7d420b",
+                    "leftValue": "={{ $json.prioridad }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "media"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "media"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "37745f6c-3649-532d-b3d6-d10b5fcfbed9",
+                    "leftValue": "={{ $json.prioridad }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "baja"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "baja"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "9334831f-481c-56dc-9e54-bc5d0fd11a4e",
+      "name": "Según prioridad",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.5,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "63dc6e4b-01c5-55ba-8f9f-fb8d86d62b60",
+              "name": "plazoRecomendado",
+              "value": "hoy",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "c8583bdb-c1a5-518f-b68b-5d28901b60c8",
+      "name": "Plazo alta",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        680,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e88ec3a3-319a-577a-9520-76b59699ccd5",
+              "name": "plazoRecomendado",
+              "value": "esta semana",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "c77b2716-347d-588a-8ca8-635034197d95",
+      "name": "Plazo media",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        680,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f9ae35f3-19e8-5944-a651-c6c04a5784a9",
+              "name": "plazoRecomendado",
+              "value": "cuando haya tiempo",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "8af5ff48-7f2f-557b-ae3d-839182838034",
+      "name": "Plazo baja",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        680,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "id": "f563659c-4c26-5cf2-b987-c86518bb9f0c",
+      "name": "Unir ramas",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        900,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 2,
+        "options": {}
+      },
+      "id": "ae6a303e-8b5d-5210-8384-eb2f19def4fe",
+      "name": "Recorrer en lotes de 2",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1120,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Se ejecuta una vez por cada lote de 2 items.\n// $runIndex indica el número de vuelta del bucle (empieza en 0).\nreturn $input.all().map((item) => ({\n  json: { ...item.json, lote: $runIndex + 1, procesadoEn: $now.toFormat('HH:mm:ss') },\n}));"
+      },
+      "id": "e8b4d827-976a-582e-89d4-a1eb35b22373",
+      "name": "Procesar lote",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// La salida \"done\" del bucle entrega todos los items procesados.\nconst tareas = $input.all().map((item) => item.json);\nconst porPrioridad = {};\nfor (const t of tareas) porPrioridad[t.prioridad] = (porPrioridad[t.prioridad] || 0) + 1;\n\nreturn [{ json: {\n  totalTareas: tareas.length,\n  lotes: Math.max(...tareas.map((t) => t.lote)),\n  porPrioridad,\n  tareas,\n} }];"
+      },
+      "id": "dbbe224c-a9f9-5f1c-81a2-dac24c7ef87f",
+      "name": "Resumen final",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        -120
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Según prioridad": {
+      "main": [
+        [
+          {
+            "node": "Plazo alta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Plazo media",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Plazo baja",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plazo alta": {
+      "main": [
+        [
+          {
+            "node": "Unir ramas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plazo media": {
+      "main": [
+        [
+          {
+            "node": "Unir ramas",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Plazo baja": {
+      "main": [
+        [
+          {
+            "node": "Unir ramas",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Ejecutar manualmente": {
+      "main": [
+        [
+          {
+            "node": "Tareas de ejemplo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tareas de ejemplo": {
+      "main": [
+        [
+          {
+            "node": "Según prioridad",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unir ramas": {
+      "main": [
+        [
+          {
+            "node": "Recorrer en lotes de 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recorrer en lotes de 2": {
+      "main": [
+        [
+          {
+            "node": "Resumen final",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Procesar lote",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Procesar lote": {
+      "main": [
+        [
+          {
+            "node": "Recorrer en lotes de 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

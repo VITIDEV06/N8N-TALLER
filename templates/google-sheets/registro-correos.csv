@@ -1,0 +1,3 @@
+fecha_procesado,message_id,remitente,asunto,categoria,motivo
+2026-11-17 08:05,demo-0002,soporte@proveedor.example.com,URGENTE: renovación del contrato vence hoy,importante,"Contiene ""urgente"""
+2026-11-17 08:05,demo-0003,newsletter@noticias.example.com,Las 10 herramientas de automatización de la semana,newsletter,"Contiene ""darte de baja"""

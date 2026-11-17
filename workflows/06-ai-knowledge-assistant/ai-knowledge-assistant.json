@@ -1,0 +1,489 @@
+{
+  "name": "Proyecto E - AI Knowledge Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Proyecto E - AI Knowledge Assistant\nConvierte texto desordenado en información estructurada (categoría, resumen, puntos clave, etiquetas) y la guarda en Google Sheets.\n\n**Entradas:** Webhook `POST /webhook/knowledge-assistant` con `{\"texto\": \"...\", \"fuente\": \"...\"}` o el Manual Trigger con un texto de ejemplo.\n\n**Configuración:** `useMockModel = true` funciona sin proveedor de IA. Para usar un modelo real, ponlo en `false`, ajusta `apiBaseUrl` y `model`, y asigna una credencial **Header Auth** a *Llamar al modelo*.\n\nGuía: `guides/ai-provider-setup.md`",
+        "height": 380,
+        "width": 660
+      },
+      "id": "ec0f2d72-f430-53d4-bc8f-4d2390dc7f1d",
+      "name": "Nota 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -660
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Costos\nOllama (local) es gratuito. Los proveedores en la nube pueden cobrar por uso: revisa su plan y configura un límite de gasto.",
+        "height": 150,
+        "width": 380,
+        "color": 3
+      },
+      "id": "b03de734-ee91-5b14-a617-4e3d99be0be4",
+      "name": "Nota 2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        920,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "knowledge-assistant",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "a5321566-0385-5cc5-9a7a-fc94ad19d2b5",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        -100
+      ],
+      "webhookId": "4474d3c1-321a-5916-9ab9-130f28ef9d3f"
+    },
+    {
+      "parameters": {},
+      "id": "e7d1263d-456b-51ab-9142-808b4de25bc3",
+      "name": "Ejecutar con ejemplo",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7a11dcac-8cdc-508e-9a34-5db348edad3b",
+              "name": "texto",
+              "value": "Reunión con el equipo de diseño el jueves. Acordamos entregar el prototipo de la app de hábitos el 5 de diciembre. Laura revisará la paleta de colores y Marcos preparará el informe de pruebas con usuarios. Pendiente: reservar sala para la demo y enviar la agenda al cliente.",
+              "type": "string"
+            },
+            {
+              "id": "5a14d0a1-f3fd-54f0-a453-e3aa20d78e6c",
+              "name": "fuente",
+              "value": "ejemplo-manual",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7fe092aa-6e4a-5860-ad1c-7a397eb15748",
+      "name": "Texto de ejemplo",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        220,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6ec27ecb-74a8-56cf-b333-b11c2e9eecc2",
+              "name": "useMockModel",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "f7c181ac-067c-51ba-8297-ebc4602ec3b4",
+              "name": "apiBaseUrl",
+              "value": "http://host.docker.internal:11434/v1",
+              "type": "string"
+            },
+            {
+              "id": "1e318a9c-7ae5-581d-a2ff-a547c031959c",
+              "name": "model",
+              "value": "llama3.2",
+              "type": "string"
+            },
+            {
+              "id": "2c7ea6cf-44f6-5367-9f36-113ba50cefe2",
+              "name": "maxInputChars",
+              "value": 6000,
+              "type": "number"
+            },
+            {
+              "id": "678828d3-b55a-5213-a025-e86bbd804543",
+              "name": "categorias",
+              "value": "trabajo,estudio,personal,finanzas,salud,ideas,referencia",
+              "type": "string"
+            },
+            {
+              "id": "b0800554-b377-5338-a8ad-1f2b32f9c9c0",
+              "name": "spreadsheetId",
+              "value": "REEMPLAZAR_CON_EL_ID_DE_TU_HOJA",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "74680bf3-c114-5f3e-a6cc-03e0437cfba1",
+      "name": "Configuración",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---------------------------------------------------------------\n// Valida la entrada y construye la petición para el modelo.\n// Acepta datos del Webhook (body.texto) o del Manual Trigger (texto).\n// ---------------------------------------------------------------\nconst config = $('Configuración').first().json;\nconst entrada = $input.first().json;\nconst datos = entrada.body && typeof entrada.body === 'object' ? entrada.body : entrada;\n\nconst texto = String(datos.texto || '').replace(/\\s+/g, ' ').trim();\nconst fuente = String(datos.fuente || 'manual').slice(0, 100);\nconst maximo = Number(config.maxInputChars) || 6000;\nconst categorias = String(config.categorias).split(',').map((c) => c.trim()).filter(Boolean);\n\nif (texto.length < 20) {\n  return [{ json: { valido: false, error: 'El campo \"texto\" es obligatorio y debe tener al menos 20 caracteres.' } }];\n}\n\nconst textoRecortado = texto.slice(0, maximo);\nconst instrucciones = [\n  'Eres un asistente que organiza información personal.',\n  'Analiza el texto del usuario y responde SOLO con un objeto JSON válido, sin texto adicional,',\n  'con exactamente estas claves:',\n  `- \"categoria\": una de [${categorias.join(', ')}]`,\n  '- \"titulo\": título breve de máximo 80 caracteres',\n  '- \"resumen\": resumen en español de máximo 3 frases',\n  '- \"puntos_clave\": lista de 1 a 5 frases cortas',\n  '- \"etiquetas\": lista de 1 a 5 palabras clave en minúsculas',\n  'No inventes datos que no estén en el texto.',\n].join('\\n');\n\nreturn [{ json: {\n  valido: true,\n  texto: textoRecortado,\n  recortado: texto.length > maximo,\n  fuente,\n  categorias,\n  requestBody: {\n    model: config.model,\n    temperature: 0.2,\n    messages: [\n      { role: 'system', content: instrucciones },\n      { role: 'user', content: textoRecortado },\n    ],\n  },\n} }];"
+      },
+      "id": "ce2415e2-848c-59bb-933e-9169ab074ad3",
+      "name": "Preparar solicitud",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "6f6359f9-2d83-51d5-b845-7d0ef91c67ab",
+              "leftValue": "={{ $json.valido }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "731e1579-c231-5c30-a4aa-0688a86e325c",
+      "name": "¿Entrada válida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "b1f80558-512d-554a-b366-41ce36112328",
+              "leftValue": "={{ $('Configuración').first().json.useMockModel }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "62db2825-4153-5b55-a6a0-fe05a513960b",
+      "name": "¿Modo simulado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1100,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---------------------------------------------------------------\n// MODELO SIMULADO: reglas por palabras clave, NO es inteligencia artificial.\n// Devuelve el mismo formato que la API compatible con OpenAI para que\n// el resto del workflow funcione igual sin proveedor configurado.\n// ---------------------------------------------------------------\nconst { texto, categorias } = $input.first().json;\nconst minusculas = texto.toLowerCase();\nconst PISTAS = {\n  trabajo: ['reunión', 'cliente', 'proyecto', 'entrega', 'equipo', 'informe'],\n  estudio: ['curso', 'aprender', 'examen', 'tutorial', 'estudiar', 'clase'],\n  finanzas: ['pago', 'factura', 'presupuesto', 'ahorro', 'gasto'],\n  salud: ['ejercicio', 'médico', 'dormir', 'dieta', 'salud'],\n  ideas: ['idea', 'podría', 'proponer', 'mejorar'],\n};\nconst categoria = Object.keys(PISTAS).find((c) => categorias.includes(c) && PISTAS[c].some((p) => minusculas.includes(p)))\n  || (categorias.includes('referencia') ? 'referencia' : categorias[0]);\n\nconst frases = texto.split(/(?<=[.!?])\\s+/).filter((f) => f.length > 10);\nconst palabras = [...new Set(minusculas.match(/[a-záéíóúñ]{6,}/g) || [])].slice(0, 4);\n\nconst contenido = {\n  categoria,\n  titulo: (frases[0] || texto).slice(0, 80),\n  resumen: frases.slice(0, 2).join(' ') || texto.slice(0, 200),\n  puntos_clave: frases.slice(0, 3).map((f) => f.slice(0, 120)),\n  etiquetas: palabras,\n};\n\nreturn [{ json: {\n  model: 'simulado',\n  choices: [{ index: 0, message: { role: 'assistant', content: JSON.stringify(contenido) } }],\n} }];"
+      },
+      "id": "a9e616e1-f00a-5782-babd-e727cb251912",
+      "name": "Modelo simulado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Configuración').first().json.apiBaseUrl }}/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "a23ebdae-931b-5ef4-a534-e22760ddc3fd",
+      "name": "Llamar al modelo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1340,
+        -20
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---------------------------------------------------------------\n// La salida de un modelo es texto NO confiable: se extrae el JSON,\n// se valida su estructura y se normalizan los campos antes de guardar.\n// ---------------------------------------------------------------\nconst preparado = $('Preparar solicitud').first().json;\nconst respuesta = $input.first().json;\nconst contenido = String(respuesta.choices?.[0]?.message?.content || '');\nconst modelo = String(respuesta.model || 'desconocido');\n\nfunction extraerJson(texto) {\n  const limpio = texto.replace(/```(?:json)?/gi, '').trim();\n  const inicio = limpio.indexOf('{');\n  const fin = limpio.lastIndexOf('}');\n  if (inicio === -1 || fin <= inicio) throw new Error('La respuesta no contiene un objeto JSON');\n  return JSON.parse(limpio.slice(inicio, fin + 1));\n}\n\nconst lista = (v, max) => (Array.isArray(v) ? v : [])\n  .map((x) => String(x).trim()).filter(Boolean).slice(0, max);\n\nconst errores = [];\nlet datos = {};\ntry {\n  datos = extraerJson(contenido);\n} catch (error) {\n  errores.push(`JSON no válido: ${error.message}`);\n}\n\nlet categoria = String(datos.categoria || '').toLowerCase().trim();\nif (!preparado.categorias.includes(categoria)) {\n  if (categoria) errores.push(`Categoría desconocida \"${categoria}\"`);\n  categoria = 'referencia';\n}\nconst resumen = String(datos.resumen || '').trim().slice(0, 600);\nif (!resumen) errores.push('Falta el resumen');\nconst puntos = lista(datos.puntos_clave, 5);\nif (puntos.length === 0) errores.push('Faltan los puntos clave');\n\nreturn [{ json: {\n  valido: errores.length === 0,\n  errores: errores.join('; '),\n  id: 'K-' + Date.now().toString(36).toUpperCase(),\n  fecha: $now.toFormat('yyyy-MM-dd HH:mm'),\n  fuente: preparado.fuente,\n  categoria,\n  titulo: String(datos.titulo || '').trim().slice(0, 80) || preparado.texto.slice(0, 80),\n  resumen,\n  puntos_clave: puntos.join(' | '),\n  etiquetas: lista(datos.etiquetas, 5).map((e) => e.toLowerCase()).join(', '),\n  modelo,\n  estado: errores.length === 0 ? 'ok' : 'revisar',\n  texto_original: preparado.texto.slice(0, 1000),\n} }];"
+      },
+      "id": "de6e0c29-0641-5283-9c67-c5a6a7218894",
+      "name": "Validar respuesta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1580,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Configuración').first().json.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Conocimiento",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW",
+          "handlingExtraData": "ignoreIt"
+        }
+      },
+      "id": "69a734e3-66bb-5d9c-b12c-66ceec05fd36",
+      "name": "Guardar en Conocimiento",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1800,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Respuesta final (también es la respuesta HTTP del Webhook).\nconst r = $('Validar respuesta').first().json;\nreturn [{ json: {\n  ok: true,\n  id: r.id,\n  estado: r.estado,\n  categoria: r.categoria,\n  titulo: r.titulo,\n  resumen: r.resumen,\n  puntos_clave: r.puntos_clave.split(' | ').filter(Boolean),\n  etiquetas: r.etiquetas.split(', ').filter(Boolean),\n  errores: r.errores || undefined,\n} }];"
+      },
+      "id": "33ebe46e-469d-5a9b-8a3d-7c34b8cbba0b",
+      "name": "Respuesta final",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2020,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Respuesta para entradas no válidas.\nreturn [{ json: { ok: false, error: $json.error } }];"
+      },
+      "id": "bf371c31-a912-57c1-b168-523eaaee7244",
+      "name": "Respuesta de error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        160
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Preparar solicitud": {
+      "main": [
+        [
+          {
+            "node": "¿Entrada válida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Entrada válida?": {
+      "main": [
+        [
+          {
+            "node": "¿Modo simulado?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta de error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Modo simulado?": {
+      "main": [
+        [
+          {
+            "node": "Modelo simulado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Llamar al modelo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modelo simulado": {
+      "main": [
+        [
+          {
+            "node": "Validar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Llamar al modelo": {
+      "main": [
+        [
+          {
+            "node": "Validar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar respuesta": {
+      "main": [
+        [
+          {
+            "node": "Guardar en Conocimiento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ejecutar con ejemplo": {
+      "main": [
+        [
+          {
+            "node": "Texto de ejemplo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Texto de ejemplo": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuración": {
+      "main": [
+        [
+          {
+            "node": "Preparar solicitud",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar en Conocimiento": {
+      "main": [
+        [
+          {
+            "node": "Respuesta final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

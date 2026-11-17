@@ -1,0 +1,170 @@
+{
+  "name": "03 - Webhook con validación",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 03 - Webhook con validación\nRecibe un POST con JSON, valida los datos y responde con 200 o 400.\n\nPrueba (URL de test, tras pulsar **Execute workflow**):\n```\ncurl -X POST http://localhost:5678/webhook-test/taller-saludo \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"nombre\":\"Ana\",\"email\":\"ana@example.com\"}'\n```",
+        "height": 300,
+        "width": 560
+      },
+      "id": "03b1f30b-6858-585f-84a1-08215444f2a7",
+      "name": "Nota 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -340
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "taller-saludo",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "c39fccdb-8368-5d9e-8e6e-4cf9cd163fcc",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "996d26b4-aefa-5503-a7c4-942f2aa6a983"
+    },
+    {
+      "parameters": {
+        "jsCode": "// El nodo Webhook entrega el cuerpo de la petición en $json.body\nconst body = $input.first().json.body || {};\nconst errores = [];\n\nconst nombre = typeof body.nombre === 'string' ? body.nombre.trim() : '';\nconst email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';\n\nif (nombre.length < 2 || nombre.length > 60) errores.push('\"nombre\" debe tener entre 2 y 60 caracteres');\nif (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) errores.push('\"email\" no tiene un formato válido');\n\nreturn [{ json: { valido: errores.length === 0, errores, nombre, email } }];"
+      },
+      "id": "99421229-400d-5709-82a8-ff88907833b0",
+      "name": "Validar entrada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "1bfbb6c7-0466-507b-9fef-3b39ce8265be",
+              "leftValue": "={{ $json.valido }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "b8136aef-8520-542a-9a3c-3732386a9905",
+      "name": "¿Datos válidos?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, mensaje: 'Hola, ' + $json.nombre + '. Datos recibidos correctamente.' } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "93e9b02d-a478-5abb-a583-6e29b4964f98",
+      "name": "Responder 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        680,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, errores: $json.errores } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "57e0650d-41d9-59cd-9100-9df57f6c60a8",
+      "name": "Responder 400",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        680,
+        100
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validar entrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar entrada": {
+      "main": [
+        [
+          {
+            "node": "¿Datos válidos?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Datos válidos?": {
+      "main": [
+        [
+          {
+            "node": "Responder 200",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder 400",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

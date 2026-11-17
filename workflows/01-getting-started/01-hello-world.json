@@ -1,0 +1,112 @@
+{
+  "name": "01 - Hola mundo",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 01 - Hola mundo\nPrimer workflow del taller.\n\n1. Pulsa **Execute workflow**.\n2. Abre cada nodo y compara INPUT y OUTPUT.\n3. Cambia el campo `nombre` en **Crear saludo** y vuelve a ejecutar.",
+        "height": 220,
+        "width": 520
+      },
+      "id": "529690d8-835e-5434-8660-721b361740c6",
+      "name": "Nota 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -260
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "0f3878c2-15a3-5f1f-a20e-9d1a329266ec",
+      "name": "Ejecutar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fe12ef88-7e00-522e-8b1c-53988ccc114a",
+              "name": "nombre",
+              "value": "Estudiante",
+              "type": "string"
+            },
+            {
+              "id": "02b1abad-8ae7-52b6-961e-1d37cde779d0",
+              "name": "curso",
+              "value": "n8n Productivity Workshop",
+              "type": "string"
+            },
+            {
+              "id": "2fd3f55a-9849-5708-879e-841bf1e92556",
+              "name": "fecha",
+              "value": "={{ $now.toFormat('yyyy-MM-dd') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "158f88a5-e789-5f3f-a0bb-5d8fd4c9b5ee",
+      "name": "Crear saludo",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Lee el primer item que llega desde \"Crear saludo\"\nconst datos = $input.first().json;\n\nconst mensaje = `Hola, ${datos.nombre}. Hoy es ${datos.fecha} y acabas de ejecutar tu primer workflow.`;\n\n// Un nodo Code devuelve siempre una lista de items con la clave \"json\"\nreturn [{ json: { mensaje, longitud: mensaje.length } }];"
+      },
+      "id": "1de1bc7f-e116-56d4-906d-e4fa2790ee77",
+      "name": "Construir mensaje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Ejecutar manualmente": {
+      "main": [
+        [
+          {
+            "node": "Crear saludo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crear saludo": {
+      "main": [
+        [
+          {
+            "node": "Construir mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

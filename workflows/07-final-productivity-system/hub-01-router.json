@@ -1,0 +1,512 @@
+{
+  "name": "Hub 1 - Router principal (Telegram)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Personal Productivity Hub - Router principal\nPunto de entrada único del bot. Interpreta el comando y delega en un sub-workflow.\n\n**Después de importar los 7 workflows del hub:**\n1. Abre cada nodo *Módulo ...* y selecciona el sub-workflow correspondiente en **Workflow** (los IDs cambian al importar).\n2. Rellena **Configuración**: `chatIdAutorizado`, `spreadsheetId`, `calendarId`.\n3. Credencial Telegram en el trigger y en *Enviar respuesta*.\n4. Publica el router (los sub-workflows no necesitan publicarse).",
+        "height": 340,
+        "width": 640
+      },
+      "id": "ca212e6f-dab2-5e24-8f59-f9901b240139",
+      "name": "Nota 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -640
+      ]
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "019c1fd0-bcea-50d4-8cab-33082b18c0d4",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "e55bb40d-086d-57c1-b12b-f08f7dc012a5"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "84de94ef-4796-5dc5-a89e-f588a71e691a",
+              "name": "chatIdAutorizado",
+              "value": "REEMPLAZAR_CON_TU_CHAT_ID",
+              "type": "string"
+            },
+            {
+              "id": "3b8a0f07-92ce-5b6a-a9e1-f2322ff2e3dc",
+              "name": "spreadsheetId",
+              "value": "REEMPLAZAR_CON_EL_ID_DE_TU_HOJA",
+              "type": "string"
+            },
+            {
+              "id": "8cb61997-d1a8-5966-a1f2-1e5b827e3158",
+              "name": "calendarId",
+              "value": "primary",
+              "type": "string"
+            },
+            {
+              "id": "b613bba7-0a32-5fa8-ac5d-812407fd73dd",
+              "name": "incluirTareas",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "004ec4f1-c0c9-5b07-8099-774d3963e1ab",
+              "name": "inicioJornada",
+              "value": "08:00",
+              "type": "string"
+            },
+            {
+              "id": "77f9e4b0-e821-5064-8de4-522f12f231ab",
+              "name": "finJornada",
+              "value": "20:00",
+              "type": "string"
+            },
+            {
+              "id": "8f9869ee-9f1e-5ac0-ac8c-ecdac7889e83",
+              "name": "aiEnabled",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "a43cca5b-62dc-54b5-8c29-56d7519d25ca",
+              "name": "useMockModel",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "da8d1e0d-afa1-58bb-b877-c80eb8839f6a",
+              "name": "apiBaseUrl",
+              "value": "http://host.docker.internal:11434/v1",
+              "type": "string"
+            },
+            {
+              "id": "42cb78fb-f220-5407-b2b9-8fb1ab5bf1fe",
+              "name": "model",
+              "value": "llama3.2",
+              "type": "string"
+            },
+            {
+              "id": "375c65f4-0a9a-5820-b432-2ed046ba6cdc",
+              "name": "maxInputChars",
+              "value": 6000,
+              "type": "number"
+            },
+            {
+              "id": "be40f52b-b730-55ec-ae44-7fa072da33c4",
+              "name": "categorias",
+              "value": "trabajo,estudio,personal,finanzas,salud,ideas,referencia",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8201efec-ad81-5ea7-a281-d360f9461307",
+      "name": "Configuración",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---------------------------------------------------------------\n// Router del Personal Productivity Hub.\n// Decide qué módulo atiende el mensaje y le pasa la configuración.\n// modulo: tareas | habitos | agenda | nota | ayuda | error\n// ---------------------------------------------------------------\nconst config = $('Configuración').first().json;\nconst mensaje = $('Telegram Trigger').first().json.message || {};\nconst chatId = String(mensaje.chat?.id || '');\nconst texto = String(mensaje.text || '').trim();\n\nconst AYUDA = [\n  'Personal Productivity Hub',\n  '',\n  'TAREAS: /nueva, /tareas, /estado, /hecha',\n  'HÁBITOS: /habito, /habitos, /hoy, /stats',\n  'AGENDA: /agenda - eventos y tareas de hoy',\n  'NOTAS IA: /nota texto - clasifica y resume una nota' + (config.aiEnabled ? '' : ' (desactivado)'),\n  '',\n  'Un texto sin comando crea una tarea rápida.',\n].join('\\n');\n\nconst RUTAS = {\n  '/nueva': 'tareas', '/tareas': 'tareas', '/estado': 'tareas', '/hecha': 'tareas',\n  '/habito': 'habitos', '/habitos': 'habitos', '/hoy': 'habitos', '/stats': 'habitos',\n  '/agenda': 'agenda',\n  '/nota': 'nota',\n  '/start': 'ayuda', '/ayuda': 'ayuda', '/help': 'ayuda',\n};\n\nconst salida = { chatId, texto, config: { ...config } };\ndelete salida.config.chatIdAutorizado;\n\n// 1. Seguridad: solo responde al chat autorizado (si está configurado).\nconst autorizado = String(config.chatIdAutorizado || '').trim();\nif (autorizado && !autorizado.startsWith('REEMPLAZAR') && autorizado !== chatId) {\n  return [{ json: { ...salida, modulo: 'error', respuesta: 'Este bot es privado.' } }];\n}\n\n// 2. Solo mensajes de texto.\nif (!texto) {\n  return [{ json: { ...salida, modulo: 'error', respuesta: 'Solo puedo procesar mensajes de texto.' } }];\n}\n\n// 3. Enrutado por comando.\nconst primera = texto.split(/\\s+/)[0];\nconst comando = primera.startsWith('/') ? primera.toLowerCase().split('@')[0] : null;\nconst argumentos = comando ? texto.slice(primera.length).trim() : texto;\nconst modulo = comando === null ? 'tareas' : RUTAS[comando];\n\nif (!modulo) return [{ json: { ...salida, modulo: 'error', respuesta: `Comando no reconocido: ${comando}\\n\\n${AYUDA}` } }];\nif (modulo === 'ayuda') return [{ json: { ...salida, modulo, respuesta: AYUDA } }];\nif (modulo === 'nota' && !config.aiEnabled) {\n  return [{ json: { ...salida, modulo: 'error', respuesta: 'Las notas con IA están desactivadas. Actívalas con aiEnabled = true en la Configuración del router.' } }];\n}\nreturn [{ json: { ...salida, modulo, comando, argumentos } }];"
+      },
+      "id": "df29e45b-313f-589b-a448-e9ce5f70f088",
+      "name": "Interpretar comando",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "4ddf154c-9491-5537-9894-a3cb4baade46",
+                    "leftValue": "={{ $json.modulo }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "tareas"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "tareas"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "3d015e31-637b-504d-9a55-36111e1ea216",
+                    "leftValue": "={{ $json.modulo }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "habitos"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "habitos"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "30a0a088-b5d8-5b77-8b0f-6f858ee19c52",
+                    "leftValue": "={{ $json.modulo }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "agenda"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "agenda"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "d2d306b5-fd8a-59c4-a987-f398330ab71c",
+                    "leftValue": "={{ $json.modulo }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "nota"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "nota"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Respuesta directa"
+        }
+      },
+      "id": "90c89ece-ec92-5054-8292-5000a0e27ca8",
+      "name": "Según el módulo",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.5,
+      "position": [
+        680,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "REEMPLAZAR_ID_HUB_TAREAS",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "540dd2b9-84af-5da2-8a80-935fbd3e6aba",
+      "name": "Módulo de tareas",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        940,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "REEMPLAZAR_ID_HUB_HABITOS",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "4297c4d1-b45b-5aa2-9a2d-49b0062f41a7",
+      "name": "Módulo de hábitos",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        940,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "REEMPLAZAR_ID_HUB_AGENDA",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "0186604a-1c89-5451-9b24-48b6009e92b6",
+      "name": "Módulo de agenda",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        940,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "REEMPLAZAR_ID_HUB_NOTAS_IA",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "aa559f51-02cf-5502-93e6-8c312de47a42",
+      "name": "Módulo de notas IA",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        940,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.respuesta }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "43d656bd-193c-576c-ab40-3443deda9af7",
+      "name": "Enviar respuesta",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1220,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Según el módulo": {
+      "main": [
+        [
+          {
+            "node": "Módulo de tareas",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Módulo de hábitos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Módulo de agenda",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Módulo de notas IA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Módulo de tareas": {
+      "main": [
+        [
+          {
+            "node": "Enviar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Módulo de hábitos": {
+      "main": [
+        [
+          {
+            "node": "Enviar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Módulo de agenda": {
+      "main": [
+        [
+          {
+            "node": "Enviar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Módulo de notas IA": {
+      "main": [
+        [
+          {
+            "node": "Enviar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuración": {
+      "main": [
+        [
+          {
+            "node": "Interpretar comando",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Interpretar comando": {
+      "main": [
+        [
+          {
+            "node": "Según el módulo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

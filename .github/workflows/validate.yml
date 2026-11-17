@@ -1,0 +1,68 @@
+name: Validar workflows
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "workflows/**"
+      - "exercises/**"
+      - "templates/**"
+      - "scripts/**"
+      - ".github/workflows/validate.yml"
+  pull_request:
+    paths:
+      - "workflows/**"
+      - "exercises/**"
+      - "templates/**"
+      - "scripts/**"
+      - ".github/workflows/validate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validación estática
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validar workflows y soluciones
+        run: python scripts/validate-workflows.py --strict
+
+      - name: Validar JSON de plantillas y datos de prueba
+        run: |
+          python - <<'EOF'
+          import json, pathlib, sys
+          errores = 0
+          for f in sorted(pathlib.Path("templates").rglob("*.json")):
+              try:
+                  json.loads(f.read_text(encoding="utf-8"))
+                  print(f"[OK   ] {f}")
+              except Exception as exc:
+                  errores += 1
+                  print(f"[FALLO] {f}: {exc}")
+          sys.exit(1 if errores else 0)
+          EOF
+
+      - name: Comprobar que no hay emojis en el repositorio
+        run: |
+          python - <<'EOF'
+          import pathlib, re, sys
+          patron = re.compile("[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F000-\U0001F2FF]")
+          hallados = []
+          for f in pathlib.Path(".").rglob("*"):
+              if f.is_file() and f.suffix in {".md", ".json", ".yml", ".yaml", ".py", ".csv", ".txt"} and ".git" not in f.parts:
+                  for n, linea in enumerate(f.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
+                      if patron.search(linea):
+                          hallados.append(f"{f}:{n}")
+          print("\n".join(hallados) or "Sin emojis.")
+          sys.exit(1 if hallados else 0)
+          EOF

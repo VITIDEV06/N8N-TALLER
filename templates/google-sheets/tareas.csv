@@ -1,0 +1,4 @@
+id,titulo,prioridad,fecha_limite,estado,creada_en,actualizada_en,chat_id
+T-DEMO01,Preparar presentación del taller,alta,2026-12-01,pendiente,2026-11-17 09:00,2026-11-17 09:00,000000000
+T-DEMO02,Revisar guía de Google Sheets,media,2026-11-20,en_progreso,2026-11-17 09:05,2026-11-18 10:00,000000000
+T-DEMO03,Comprar café,baja,,completada,2026-11-17 09:10,2026-11-17 18:30,000000000

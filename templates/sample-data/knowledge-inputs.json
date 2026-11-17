@@ -1,0 +1,31 @@
+{
+  "_descripcion": "Textos ficticios para el Proyecto E (AI Knowledge Assistant). Envíalos al webhook con curl o pégalos en el nodo 'Texto de ejemplo'.",
+  "_ejemploCurl": "curl -X POST http://localhost:5678/webhook-test/knowledge-assistant -H 'Content-Type: application/json' -d '{\"texto\": \"...\", \"fuente\": \"curl\"}'",
+  "entradas": [
+    {
+      "fuente": "notas-reunion",
+      "texto": "Reunión con el equipo de diseño el jueves. Acordamos entregar el prototipo de la app de hábitos el 5 de diciembre. Laura revisará la paleta de colores y Marcos preparará el informe de pruebas con usuarios. Pendiente: reservar sala para la demo y enviar la agenda al cliente.",
+      "categoriaEsperada": "trabajo"
+    },
+    {
+      "fuente": "apuntes-curso",
+      "texto": "En n8n cada nodo recibe una lista de items y normalmente se ejecuta una vez por item. Las expresiones se escriben entre dobles llaves y permiten leer datos de nodos anteriores con $json o con $('Nombre del nodo'). Para lógica compleja conviene usar el nodo Code.",
+      "categoriaEsperada": "estudio"
+    },
+    {
+      "fuente": "finanzas-personales",
+      "texto": "Este mes el gasto en suscripciones subió a 45 unidades. Revisar si sigo usando el servicio de música y el de almacenamiento. Objetivo: ahorrar el 15 por ciento del sueldo y crear un presupuesto mensual en una hoja de cálculo.",
+      "categoriaEsperada": "finanzas"
+    },
+    {
+      "fuente": "idea",
+      "texto": "Idea: podría crear un bot que me proponga una receta según lo que queda en la nevera. Mejorar la idea añadiendo una lista de la compra automática los domingos.",
+      "categoriaEsperada": "ideas"
+    },
+    {
+      "fuente": "invalido",
+      "texto": "muy corto",
+      "categoriaEsperada": "error: entrada no válida (menos de 20 caracteres)"
+    }
+  ]
+}

@@ -1,0 +1,202 @@
+{
+  "name": "Solución M01 - Reto IF",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "def0912b-5c50-56f9-9c7b-6efd9e9f2301",
+      "name": "Ejecutar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "18acaedd-d558-563c-970b-5f1997220fd5",
+              "name": "nombre",
+              "value": "Estudiante",
+              "type": "string"
+            },
+            {
+              "id": "54574651-3284-5adc-aeb9-06879004f32e",
+              "name": "objetivo",
+              "value": "automatizar mis tareas",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c85556a4-971a-523f-b1b1-5bb9638c9199",
+      "name": "Crear saludo",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const datos = $input.first().json;\nconst mensaje = `Hola, ${datos.nombre}. Tu objetivo es: ${datos.objetivo}.`;\nreturn [{ json: { mensaje, longitud: mensaje.length } }];"
+      },
+      "id": "d0c0b544-f1a5-5359-91fb-e0c3c2513a97",
+      "name": "Construir mensaje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "a1834416-a8cd-5b1b-bb5f-7689ef11c5c2",
+              "leftValue": "={{ $json.longitud }}",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "rightValue": 50
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "9a33eb39-6861-53ec-a846-580d67d54137",
+      "name": "¿Mensaje largo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d8c0c998-6769-5677-b3b6-3961e0ff35f0",
+              "name": "resultado",
+              "value": "mensaje largo",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "a05731c5-aeef-5fd9-96de-c0ba98a306b5",
+      "name": "Mensaje largo",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        900,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0fa8a860-8ee0-5e06-9d83-0227f7aca306",
+              "name": "resultado",
+              "value": "mensaje corto",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "777c0908-f252-581f-a950-fc966ec0f200",
+      "name": "Mensaje corto",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        900,
+        100
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Ejecutar manualmente": {
+      "main": [
+        [
+          {
+            "node": "Crear saludo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crear saludo": {
+      "main": [
+        [
+          {
+            "node": "Construir mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construir mensaje": {
+      "main": [
+        [
+          {
+            "node": "¿Mensaje largo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Mensaje largo?": {
+      "main": [
+        [
+          {
+            "node": "Mensaje largo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mensaje corto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

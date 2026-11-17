@@ -1,0 +1,59 @@
+{
+  "_descripcion": "Mensajes ficticios con el formato que entrega el Telegram Trigger (update de la Bot API con 'message'). Cópialos en la salida del trigger con 'Edit Output' y fíjalos (pin) para probar los workflows sin enviar mensajes reales. El chat_id 111111111 es ficticio.",
+  "mensajes": [
+    {
+      "update_id": 100000001,
+      "message": {
+        "message_id": 1,
+        "date": 1794900000,
+        "text": "/nueva Preparar presentación | alta | 2026-12-01",
+        "chat": { "id": 111111111, "type": "private", "first_name": "Estudiante" },
+        "from": { "id": 111111111, "is_bot": false, "first_name": "Estudiante", "language_code": "es" }
+      }
+    },
+    {
+      "update_id": 100000002,
+      "message": {
+        "message_id": 2,
+        "date": 1794900060,
+        "text": "/tareas",
+        "chat": { "id": 111111111, "type": "private", "first_name": "Estudiante" },
+        "from": { "id": 111111111, "is_bot": false, "first_name": "Estudiante", "language_code": "es" }
+      }
+    },
+    {
+      "update_id": 100000003,
+      "message": {
+        "message_id": 3,
+        "date": 1794900120,
+        "text": "/habito leer capítulo 5",
+        "chat": { "id": 111111111, "type": "private", "first_name": "Estudiante" },
+        "from": { "id": 111111111, "is_bot": false, "first_name": "Estudiante", "language_code": "es" }
+      }
+    },
+    {
+      "update_id": 100000004,
+      "message": {
+        "message_id": 4,
+        "date": 1794900180,
+        "text": "/nota Idea: crear un workflow que me recuerde regar las plantas los lunes y jueves.",
+        "chat": { "id": 111111111, "type": "private", "first_name": "Estudiante" },
+        "from": { "id": 111111111, "is_bot": false, "first_name": "Estudiante", "language_code": "es" }
+      }
+    }
+  ],
+  "_comandosParaProbar": [
+    "/ayuda",
+    "/nueva Comprar café",
+    "/nueva ab",
+    "/nueva Algo | urgentisima",
+    "/nueva Algo | alta | 2020-01-01",
+    "/estado T-XXXXXX en_progreso",
+    "/hecha T-XXXXXX",
+    "/tareas todas",
+    "/habitos",
+    "/hoy",
+    "/stats 30",
+    "/agenda"
+  ]
+}

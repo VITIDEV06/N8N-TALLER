@@ -1,0 +1,221 @@
+{
+  "name": "Solución A2 - Reintentos y ruta de error",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "04ed32d8-e6b3-5e06-aa99-c2b9d567b10a",
+      "name": "Ejecutar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  'https://jsonplaceholder.typicode.com/todos/1',\n  'https://jsonplaceholder.typicode.com/no-existe',\n  'https://jsonplaceholder.typicode.com/users/1',\n].map((url) => ({ json: { url } }));"
+      },
+      "id": "0d1de403-583a-5586-b938-ab305d2c6301",
+      "name": "URLs a comprobar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "10183d80-6889-5b98-b4f5-a06e2fc910d4",
+      "name": "Comprobar URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        440,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0d455e23-f163-5823-bf70-7e6473295593",
+              "name": "estado",
+              "value": "ok",
+              "type": "string"
+            },
+            {
+              "id": "17151506-3e83-5bf0-8635-16e058f7dc9e",
+              "name": "url",
+              "value": "={{ $('URLs a comprobar').item.json.url }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "adf49d1d-8776-5222-857a-e3c3828c7ddf",
+      "name": "Marcar correcta",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        700,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "90767159-2c75-58ed-995b-a43b22234596",
+              "name": "estado",
+              "value": "error",
+              "type": "string"
+            },
+            {
+              "id": "17151506-3e83-5bf0-8635-16e058f7dc9e",
+              "name": "url",
+              "value": "={{ $('URLs a comprobar').item.json.url }}",
+              "type": "string"
+            },
+            {
+              "id": "4cbaf779-83bb-59eb-acfc-f3f907c8984e",
+              "name": "detalle",
+              "value": "={{ $json.error.message }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e8f29abc-56d4-5fdd-b3fe-4458e9ac1485",
+      "name": "Marcar fallida",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        700,
+        100
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "889cf289-65cc-58f3-abfc-5d8d5671c970",
+      "name": "Unir",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        920,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const resultados = $input.all().map((i) => i.json);\nreturn [{ json: {\n  correctas: resultados.filter((r) => r.estado === 'ok').length,\n  fallidas: resultados.filter((r) => r.estado === 'error').map((r) => r.url),\n} }];"
+      },
+      "id": "ddcbb982-060e-5c5b-b648-c8871c08f8d4",
+      "name": "Informe",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Ejecutar manualmente": {
+      "main": [
+        [
+          {
+            "node": "URLs a comprobar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "URLs a comprobar": {
+      "main": [
+        [
+          {
+            "node": "Comprobar URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comprobar URL": {
+      "main": [
+        [
+          {
+            "node": "Marcar correcta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar fallida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar correcta": {
+      "main": [
+        [
+          {
+            "node": "Unir",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar fallida": {
+      "main": [
+        [
+          {
+            "node": "Unir",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Unir": {
+      "main": [
+        [
+          {
+            "node": "Informe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

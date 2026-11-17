@@ -1,0 +1,395 @@
+{
+  "name": "Hub 6 - Resúmenes programados",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Resúmenes programados\n- Cada día a las 07:00: agenda del día (Módulo de agenda).\n- Cada domingo a las 20:00: estadísticas semanales (Módulo de hábitos con `/stats 7`).\n\nSelecciona los sub-workflows en los nodos *Módulo ...*, rellena **Configuración** y publica.",
+        "height": 240,
+        "width": 560
+      },
+      "id": "4516ed6f-675b-5951-b1f2-bf58f7f36f2a",
+      "name": "Nota 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -520
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "id": "6e92f2be-7f9d-5572-9219-704198b46ccf",
+      "name": "Cada día a las 07:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                0
+              ],
+              "triggerAtHour": 20
+            }
+          ]
+        }
+      },
+      "id": "6dcf07ec-530b-5332-9cac-00d1b3be348b",
+      "name": "Domingo a las 20:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ef38e5a1-4942-5721-b65b-c3f84a888674",
+              "name": "modulo",
+              "value": "agenda",
+              "type": "string"
+            },
+            {
+              "id": "2b6b8494-eb8c-57e5-96d0-d84af7e26374",
+              "name": "texto",
+              "value": "/agenda",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d0f2fe04-3da7-576c-8bab-0d8664664fac",
+      "name": "Solicitud de agenda",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        220,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "30c6a916-6a8e-573a-93a3-fbb07b8feac5",
+              "name": "modulo",
+              "value": "habitos",
+              "type": "string"
+            },
+            {
+              "id": "efef3956-5847-5d2b-8c43-a2d13cb34fc1",
+              "name": "texto",
+              "value": "/stats 7",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "eeb25e04-2004-5f06-a2fd-f837828eb310",
+      "name": "Solicitud de estadísticas",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        220,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b265bb5f-345a-554d-b979-dccb188a1f36",
+              "name": "chatId",
+              "value": "REEMPLAZAR_CON_TU_CHAT_ID",
+              "type": "string"
+            },
+            {
+              "id": "54317298-6880-5ce6-936b-8c9456769bf7",
+              "name": "config",
+              "value": "={{ { spreadsheetId: 'REEMPLAZAR_CON_EL_ID_DE_TU_HOJA', calendarId: 'primary', incluirTareas: true, inicioJornada: '08:00', finJornada: '20:00' } }}",
+              "type": "object"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "d80de8fa-c1cc-5975-b352-dc2678cafe84",
+      "name": "Configuración",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        460,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "0b9acbd7-e6b2-546b-95fc-0ecf08b2e0c2",
+                    "leftValue": "={{ $json.modulo }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "agenda"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "agenda"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "340bdd7b-cad2-5e2d-bc3c-d68d7e7ceb3c",
+                    "leftValue": "={{ $json.modulo }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "habitos"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "habitos"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "d31d83b9-d98e-55e2-81aa-d6a90a761ce7",
+      "name": "Según el módulo",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.5,
+      "position": [
+        680,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "REEMPLAZAR_ID_HUB_AGENDA",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "27fb307e-df61-5a01-91c3-134b8053bb74",
+      "name": "Módulo de agenda",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        920,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "REEMPLAZAR_ID_HUB_HABITOS",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "0711c0f8-7487-58b7-a29e-9659c4c95d80",
+      "name": "Módulo de hábitos",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        920,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.respuesta }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "fd93a104-ecac-5714-bde3-e74576dd0a7b",
+      "name": "Enviar resumen",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1160,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Cada día a las 07:00": {
+      "main": [
+        [
+          {
+            "node": "Solicitud de agenda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Solicitud de agenda": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Domingo a las 20:00": {
+      "main": [
+        [
+          {
+            "node": "Solicitud de estadísticas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Solicitud de estadísticas": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuración": {
+      "main": [
+        [
+          {
+            "node": "Según el módulo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Según el módulo": {
+      "main": [
+        [
+          {
+            "node": "Módulo de agenda",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Módulo de hábitos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Módulo de agenda": {
+      "main": [
+        [
+          {
+            "node": "Enviar resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Módulo de hábitos": {
+      "main": [
+        [
+          {
+            "node": "Enviar resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

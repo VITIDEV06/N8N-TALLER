@@ -1,0 +1,242 @@
+{
+  "name": "Proyecto D - Resumen semanal de hábitos",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Resumen semanal de hábitos\nCada domingo a las 20:00 calcula el porcentaje de cumplimiento de los últimos 7 días y lo envía por Telegram.\n\nRellena `chatId` y `spreadsheetId` en **Configuración**. No necesita túnel HTTPS.",
+        "height": 220,
+        "width": 560
+      },
+      "id": "5db44c74-7bbe-5efd-ac54-96dfc5a49827",
+      "name": "Nota 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -360
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                0
+              ],
+              "triggerAtHour": 20
+            }
+          ]
+        }
+      },
+      "id": "1755f275-4a04-5a4c-90a1-e6a23a63a167",
+      "name": "Domingo a las 20:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        -80
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "5c29e35a-caac-53f7-a7c9-2a818d489f63",
+      "name": "Probar ahora",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ab8fa2bb-b794-5be7-9bb8-ae32f40875eb",
+              "name": "chatId",
+              "value": "REEMPLAZAR_CON_TU_CHAT_ID",
+              "type": "string"
+            },
+            {
+              "id": "0e97ebc8-f0ba-52c0-a0c2-eceb82902b3b",
+              "name": "spreadsheetId",
+              "value": "REEMPLAZAR_CON_EL_ID_DE_TU_HOJA",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7853bdc2-8b7a-531e-8610-07205a459bad",
+      "name": "Configuración",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Configuración').first().json.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Habitos",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "d01167d1-c1d5-53ee-b769-d7cf75f32448",
+      "name": "Leer hábitos",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        460,
+        0
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Configuración').first().json.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "RegistroHabitos",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "51d065ba-b367-5bb4-bb6f-81b63ea6d80c",
+      "name": "Leer registro",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        680,
+        0
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---------------------------------------------------------------\n// Utilidades de hábitos: normalización y estadísticas.\n// ---------------------------------------------------------------\nconst normalizar = (t) => String(t || '')\n  .normalize('NFD').replace(/[̀-ͯ]/g, '')\n  .trim().toLowerCase();\n\nconst esActivo = (v) => v === true || ['si', 'true', '1', 'yes', 'activo'].includes(normalizar(v));\n\nfunction leerNodo(nombre) {\n  try {\n    return $(nombre).all().map((i) => i.json);\n  } catch (error) {\n    return [];\n  }\n}\n\nfunction habitosActivos(filas) {\n  return filas\n    .filter((h) => h && h.habito && esActivo(h.activo))\n    .map((h) => ({\n      habito: normalizar(h.habito),\n      descripcion: h.descripcion || '',\n      metaSemanal: Math.min(7, Math.max(1, Number(h.meta_semanal) || 7)),\n    }));\n}\n\nfunction registrosDelChat(filas, chatId) {\n  return filas\n    .filter((r) => r && r.habito && r.fecha)\n    .filter((r) => !chatId || String(r.chat_id) === String(chatId))\n    .map((r) => ({ ...r, habito: normalizar(r.habito), fecha: String(r.fecha).slice(0, 10) }));\n}\n\n// Porcentaje de cumplimiento en los últimos \"dias\" días (incluido hoy).\nfunction calcularEstadisticas(habitos, registros, dias) {\n  const desde = $now.minus({ days: dias - 1 }).toFormat('yyyy-MM-dd');\n  const hasta = $now.toFormat('yyyy-MM-dd');\n  return habitos.map((h) => {\n    const fechas = new Set(registros\n      .filter((r) => r.habito === h.habito && r.fecha >= desde && r.fecha <= hasta)\n      .map((r) => r.fecha));\n    const objetivo = Math.max(1, Math.round((h.metaSemanal * dias) / 7));\n    const porcentaje = Math.min(100, Math.round((fechas.size / objetivo) * 100));\n    return { habito: h.habito, diasCumplidos: fechas.size, objetivo, porcentaje };\n  });\n}\n\nfunction barra(porcentaje) {\n  const llenos = Math.round(porcentaje / 10);\n  return '#'.repeat(llenos) + '-'.repeat(10 - llenos);\n}\n\nfunction textoEstadisticas(estadisticas, dias) {\n  if (estadisticas.length === 0) return 'No hay hábitos activos en la hoja Habitos.';\n  const media = Math.round(estadisticas.reduce((s, e) => s + e.porcentaje, 0) / estadisticas.length);\n  const lineas = estadisticas\n    .sort((a, b) => b.porcentaje - a.porcentaje)\n    .map((e) => `${barra(e.porcentaje)} ${String(e.porcentaje).padStart(3)}%  ${e.habito} (${e.diasCumplidos}/${e.objetivo} días)`);\n  return [`Cumplimiento de los últimos ${dias} días`, '', ...lineas, '', `Media global: ${media}%`].join('\\n');\n}\n\n// Resumen semanal para el chat configurado.\nconst config = $('Configuración').first().json;\nconst habitos = habitosActivos(leerNodo('Leer hábitos'));\nconst registros = registrosDelChat(leerNodo('Leer registro'), config.chatId);\nconst estadisticas = calcularEstadisticas(habitos, registros, 7);\nconst mejor = [...estadisticas].sort((a, b) => b.porcentaje - a.porcentaje)[0];\nconst peor = [...estadisticas].sort((a, b) => a.porcentaje - b.porcentaje)[0];\n\nconst lineas = ['Resumen semanal de hábitos', '', textoEstadisticas(estadisticas, 7)];\nif (mejor && peor && mejor.habito !== peor.habito) {\n  lineas.push('', `Tu hábito más constante: ${mejor.habito}.`, `A reforzar la próxima semana: ${peor.habito}.`);\n}\nreturn [{ json: { chatId: String(config.chatId || ''), estadisticas, respuesta: lineas.join('\\n') } }];"
+      },
+      "id": "1ca8fb04-de77-5db6-ac0b-e347e85da45a",
+      "name": "Calcular estadísticas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.respuesta }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "cb07af51-a805-5a4d-9a2b-f4bf22ebe866",
+      "name": "Enviar resumen",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1120,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Domingo a las 20:00": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Probar ahora": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuración": {
+      "main": [
+        [
+          {
+            "node": "Leer hábitos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer hábitos": {
+      "main": [
+        [
+          {
+            "node": "Leer registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer registro": {
+      "main": [
+        [
+          {
+            "node": "Calcular estadísticas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calcular estadísticas": {
+      "main": [
+        [
+          {
+            "node": "Enviar resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

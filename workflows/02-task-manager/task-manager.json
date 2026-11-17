@@ -1,0 +1,592 @@
+{
+  "name": "Proyecto A - Personal Task Manager",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Proyecto A - Personal Task Manager\nGestiona tareas desde Telegram y las guarda en Google Sheets.\n\n**Antes de usarlo:**\n1. Credencial **Telegram API** en el trigger y en *Enviar respuesta*.\n2. Credencial de **Google Sheets** en los 4 nodos de Sheets.\n3. ID de tu hoja en **Configuración**.\n4. Túnel HTTPS para el Telegram Trigger (ver `guides/telegram-setup.md`).\n\nComandos: `/nueva`, `/tareas`, `/estado`, `/hecha`, `/ayuda`.",
+        "height": 320,
+        "width": 600
+      },
+      "id": "e8ee4ce0-bc14-553f-b5bd-b4da35236ce5",
+      "name": "Nota 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -560
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Validación\nEl nodo **Interpretar mensaje** valida comandos, título, prioridad, fecha e ID. Si algo no es válido, la respuesta de error sale por *Respuesta directa* sin tocar la hoja.",
+        "height": 160,
+        "width": 420,
+        "color": 5
+      },
+      "id": "0e01de2d-9dcd-591c-a0a9-4f930e82e4ed",
+      "name": "Nota 2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        380,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "daf2cd90-e2fe-5bc6-af11-3882f73168cb",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "54460b5d-324d-5588-b51a-2be7582eb326"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "34779d66-924a-56d0-9eeb-e932c48f0530",
+              "name": "spreadsheetId",
+              "value": "REEMPLAZAR_CON_EL_ID_DE_TU_HOJA",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2f934707-213c-5474-9deb-52bd39851d06",
+      "name": "Configuración",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---------------------------------------------------------------\n// Interpreta el texto recibido y decide la acción sobre las tareas.\n// Devuelve un objeto con \"accion\": crear | listar | actualizar | ayuda | error\n// ---------------------------------------------------------------\nconst PRIORIDADES = ['alta', 'media', 'baja'];\nconst ESTADOS = ['pendiente', 'en_progreso', 'completada'];\nconst SINONIMOS_ESTADO = {\n  pendiente: 'pendiente',\n  progreso: 'en_progreso',\n  en_progreso: 'en_progreso',\n  enprogreso: 'en_progreso',\n  completada: 'completada',\n  completa: 'completada',\n  hecha: 'completada',\n  terminada: 'completada',\n};\n\nconst AYUDA = [\n  'Gestor de tareas - comandos:',\n  '/nueva Título | prioridad | AAAA-MM-DD',\n  '   prioridad opcional: alta, media o baja (por defecto media)',\n  '   fecha límite opcional en formato AAAA-MM-DD',\n  '/tareas - tus tareas pendientes',\n  '/tareas todas - incluye las completadas',\n  '/estado ID estado - pendiente, en_progreso o completada',\n  '/hecha ID - marca la tarea como completada',\n  '',\n  'Un texto sin comando crea una tarea rápida con prioridad media.',\n].join('\\n');\n\nconst normalizar = (t) => String(t || '')\n  .normalize('NFD').replace(/[̀-ͯ]/g, '')\n  .trim().toLowerCase();\n\nfunction crearTarea(argumentos, base) {\n  const partes = argumentos.split('|').map((p) => p.trim());\n  const titulo = partes[0] || '';\n  if (titulo.length < 3) {\n    return { ...base, accion: 'error', respuesta: 'El título debe tener al menos 3 caracteres.\\nEjemplo: /nueva Preparar presentación | alta | 2026-12-01' };\n  }\n  if (titulo.length > 200) {\n    return { ...base, accion: 'error', respuesta: 'El título no puede superar 200 caracteres.' };\n  }\n  const prioridad = partes[1] ? normalizar(partes[1]) : 'media';\n  if (!PRIORIDADES.includes(prioridad)) {\n    return { ...base, accion: 'error', respuesta: `Prioridad no válida: \"${partes[1]}\". Usa alta, media o baja.` };\n  }\n  let fechaLimite = '';\n  if (partes[2]) {\n    const fecha = DateTime.fromISO(partes[2]);\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(partes[2]) || !fecha.isValid) {\n      return { ...base, accion: 'error', respuesta: `Fecha no válida: \"${partes[2]}\". Usa el formato AAAA-MM-DD, por ejemplo 2026-12-01.` };\n    }\n    if (fecha < $now.startOf('day')) {\n      return { ...base, accion: 'error', respuesta: 'La fecha límite no puede estar en el pasado.' };\n    }\n    fechaLimite = fecha.toFormat('yyyy-MM-dd');\n  }\n  const ahora = $now.toFormat('yyyy-MM-dd HH:mm');\n  return {\n    ...base,\n    accion: 'crear',\n    id: 'T-' + Date.now().toString(36).slice(-6).toUpperCase(),\n    titulo,\n    prioridad,\n    fecha_limite: fechaLimite,\n    estado: 'pendiente',\n    creada_en: ahora,\n    actualizada_en: ahora,\n    chat_id: base.chatId,\n  };\n}\n\nfunction cambiarEstado(argumentos, base) {\n  const [idTexto, ...resto] = argumentos.split(/\\s+/).filter(Boolean);\n  const id = String(idTexto || '').toUpperCase();\n  if (!/^T-[A-Z0-9]{4,8}$/.test(id)) {\n    return { ...base, accion: 'error', respuesta: 'Indica un ID válido, por ejemplo: /estado T-4F9K2A en_progreso\\nConsulta los IDs con /tareas' };\n  }\n  const estado = SINONIMOS_ESTADO[normalizar(resto.join('_'))];\n  if (!estado || !ESTADOS.includes(estado)) {\n    return { ...base, accion: 'error', respuesta: 'Estado no válido. Usa: pendiente, en_progreso o completada.' };\n  }\n  return { ...base, accion: 'actualizar', id, estado };\n}\n\nfunction interpretarTarea(textoOriginal, chatId) {\n  const base = { chatId: String(chatId || '') };\n  const texto = String(textoOriginal || '').trim();\n  if (!texto) {\n    return { ...base, accion: 'error', respuesta: 'Solo puedo procesar mensajes de texto.\\n\\n' + AYUDA };\n  }\n  const primera = texto.split(/\\s+/)[0];\n  const comando = primera.startsWith('/') ? primera.toLowerCase().split('@')[0] : null;\n  const argumentos = comando ? texto.slice(primera.length).trim() : texto;\n\n  if (['/start', '/ayuda', '/help'].includes(comando)) return { ...base, accion: 'ayuda', respuesta: AYUDA };\n  if (comando === null || comando === '/nueva') return crearTarea(argumentos, base);\n  if (comando === '/tareas') return { ...base, accion: 'listar', incluirCompletadas: normalizar(argumentos) === 'todas' };\n  if (comando === '/hecha') return cambiarEstado(`${argumentos} completada`, base);\n  if (comando === '/estado') return cambiarEstado(argumentos, base);\n  return { ...base, accion: 'error', respuesta: `Comando no reconocido: ${comando}\\n\\n${AYUDA}` };\n}\n\n// Datos del mensaje recibido por el Telegram Trigger\nconst mensaje = $('Telegram Trigger').first().json.message || {};\nreturn [{ json: interpretarTarea(mensaje.text, mensaje.chat?.id) }];"
+      },
+      "id": "1ac98ff4-9a56-53c7-8a34-3a888775e95a",
+      "name": "Interpretar mensaje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "38a4c762-66b5-5ab6-99fa-10b661395590",
+                    "leftValue": "={{ $json.accion }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "crear"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "crear"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "61f00fff-1b8c-54af-b936-4e0eb0d8cccf",
+                    "leftValue": "={{ $json.accion }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "listar"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "listar"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "62dfa088-8863-564d-be36-e326e5779c7e",
+                    "leftValue": "={{ $json.accion }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "actualizar"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "actualizar"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Respuesta directa"
+        }
+      },
+      "id": "b94ef528-093c-5f3c-bb67-22d59f3456e4",
+      "name": "Según la acción",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.5,
+      "position": [
+        680,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Configuración').first().json.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Tareas",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW",
+          "handlingExtraData": "ignoreIt"
+        }
+      },
+      "id": "c0f6b4f7-b474-595c-9403-86e864a70eb8",
+      "name": "Guardar tarea",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        940,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construye el mensaje de confirmación a partir de la tarea interpretada.\nconst t = $('Interpretar mensaje').first().json;\nconst lineas = [\n  'Tarea creada',\n  `ID: ${t.id}`,\n  `Título: ${t.titulo}`,\n  `Prioridad: ${t.prioridad}`,\n  `Fecha límite: ${t.fecha_limite || 'sin fecha'}`,\n  '',\n  `Para completarla: /hecha ${t.id}`,\n];\nreturn [{ json: { chatId: t.chatId, respuesta: lineas.join('\\n') } }];"
+      },
+      "id": "73097917-77b4-5335-abfc-1721e880a5eb",
+      "name": "Confirmar creación",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1180,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Configuración').first().json.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Tareas",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "bf419a3d-2f1c-580b-9136-5525997b6c1c",
+      "name": "Leer tareas",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        940,
+        -100
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filtra las tareas del chat, las ordena y construye el listado.\nconst peticion = $('Interpretar mensaje').first().json;\nconst filas = $input.all().map((i) => i.json).filter((f) => f && f.id);\n\nconst propias = filas.filter((f) => String(f.chat_id) === String(peticion.chatId));\nconst visibles = propias.filter((f) => peticion.incluirCompletadas || f.estado !== 'completada');\n\nconst ordenPrioridad = { alta: 0, media: 1, baja: 2 };\nvisibles.sort((a, b) =>\n  (ordenPrioridad[a.prioridad] ?? 3) - (ordenPrioridad[b.prioridad] ?? 3) ||\n  String(a.fecha_limite || '9999-12-31').localeCompare(String(b.fecha_limite || '9999-12-31')));\n\nif (visibles.length === 0) {\n  return [{ json: { chatId: peticion.chatId, total: 0, respuesta: 'No tienes tareas pendientes. Crea una con /nueva Título' } }];\n}\n\nconst hoy = $now.toFormat('yyyy-MM-dd');\nconst MAX = 25;\nconst lineas = visibles.slice(0, MAX).map((t) => {\n  const fecha = t.fecha_limite ? ` | vence ${t.fecha_limite}${t.fecha_limite < hoy && t.estado !== 'completada' ? ' (VENCIDA)' : ''}` : '';\n  return `${t.id} [${t.prioridad}] ${t.titulo} - ${t.estado}${fecha}`;\n});\nconst titulo = peticion.incluirCompletadas ? 'Todas tus tareas' : 'Tus tareas pendientes';\nlet respuesta = `${titulo} (${visibles.length}):\\n\\n${lineas.join('\\n')}`;\nif (visibles.length > MAX) respuesta += `\\n\\n... y ${visibles.length - MAX} más.`;\n\nreturn [{ json: { chatId: peticion.chatId, total: visibles.length, respuesta } }];"
+      },
+      "id": "2e7f3365-b479-52f3-bb89-9766a011a216",
+      "name": "Formatear lista",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1180,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Configuración').first().json.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Tareas",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "7d0f10dc-6451-53a3-bc2d-b5f99af7b9fd",
+      "name": "Leer tareas para actualizar",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        940,
+        120
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Busca la tarea por ID dentro de las tareas del mismo chat.\nconst peticion = $('Interpretar mensaje').first().json;\nconst filas = $input.all().map((i) => i.json).filter((f) => f && f.id);\nconst tarea = filas.find((f) =>\n  String(f.id).toUpperCase() === peticion.id && String(f.chat_id) === String(peticion.chatId));\n\nif (!tarea) {\n  return [{ json: {\n    encontrada: false,\n    chatId: peticion.chatId,\n    respuesta: `No encontré la tarea ${peticion.id}. Consulta tus tareas con /tareas`,\n  } }];\n}\n\n// Solo se envían a Google Sheets la columna clave (id) y las columnas que cambian.\nreturn [{ json: {\n  encontrada: true,\n  id: tarea.id,\n  estado: peticion.estado,\n  actualizada_en: $now.toFormat('yyyy-MM-dd HH:mm'),\n  chatId: peticion.chatId,\n  titulo: tarea.titulo,\n  estadoAnterior: tarea.estado,\n} }];"
+      },
+      "id": "2a7b390f-8082-5dd8-9fb0-06d613ed729e",
+      "name": "Buscar tarea",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1180,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "3ee6bd8e-ca7c-5bf8-ad33-7708500b9f17",
+              "leftValue": "={{ $json.encontrada }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "3debf53a-4d47-5440-9b80-23e1e4eab94d",
+      "name": "¿Tarea encontrada?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1400,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Configuración').first().json.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Tareas",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW",
+          "handlingExtraData": "ignoreIt"
+        }
+      },
+      "id": "4071a8cd-7924-581a-87b5-0552446f3002",
+      "name": "Actualizar estado",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1620,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mensaje de confirmación del cambio de estado.\nconst t = $('Buscar tarea').first().json;\nreturn [{ json: {\n  chatId: t.chatId,\n  respuesta: `Tarea ${t.id} actualizada\\n${t.titulo}\\nEstado: ${t.estadoAnterior} -> ${t.estado}`,\n} }];"
+      },
+      "id": "bc1d07eb-ff44-531a-900d-a19278396f6d",
+      "name": "Confirmar actualización",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.respuesta }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "4a70b040-e36e-599d-b0f6-433e8688484a",
+      "name": "Enviar respuesta",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2100,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Según la acción": {
+      "main": [
+        [
+          {
+            "node": "Guardar tarea",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Leer tareas",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Leer tareas para actualizar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar tarea": {
+      "main": [
+        [
+          {
+            "node": "Confirmar creación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer tareas": {
+      "main": [
+        [
+          {
+            "node": "Formatear lista",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer tareas para actualizar": {
+      "main": [
+        [
+          {
+            "node": "Buscar tarea",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar tarea": {
+      "main": [
+        [
+          {
+            "node": "¿Tarea encontrada?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Tarea encontrada?": {
+      "main": [
+        [
+          {
+            "node": "Actualizar estado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Actualizar estado": {
+      "main": [
+        [
+          {
+            "node": "Confirmar actualización",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuración": {
+      "main": [
+        [
+          {
+            "node": "Interpretar mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Interpretar mensaje": {
+      "main": [
+        [
+          {
+            "node": "Según la acción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirmar creación": {
+      "main": [
+        [
+          {
+            "node": "Enviar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear lista": {
+      "main": [
+        [
+          {
+            "node": "Enviar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirmar actualización": {
+      "main": [
+        [
+          {
+            "node": "Enviar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

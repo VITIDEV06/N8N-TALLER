@@ -1,0 +1,45 @@
+name: Propuesta de contenido
+description: Proponer un workflow, ejercicio, módulo o mejora de la documentación.
+title: "[Propuesta]: "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Tipo de propuesta
+      options:
+        - Nuevo workflow
+        - Nuevo ejercicio
+        - Mejora de un módulo
+        - Nueva guía de integración
+        - Otro
+    validations:
+      required: true
+  - type: dropdown
+    id: level
+    attributes:
+      label: Nivel
+      options:
+        - Beginner
+        - Intermediate
+        - Advanced
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: Objetivo de aprendizaje
+      description: Qué aprenderá la persona que siga este contenido.
+    validations:
+      required: true
+  - type: textarea
+    id: services
+    attributes:
+      label: Servicios externos necesarios
+      description: Indica si alguno puede generar costos.
+  - type: textarea
+    id: details
+    attributes:
+      label: Descripción
+    validations:
+      required: true

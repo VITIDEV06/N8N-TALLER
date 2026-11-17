@@ -1,0 +1,35 @@
+{
+  "_descripcion": "Eventos ficticios con el formato que devuelve el nodo Google Calendar (operación Get Many). Úsalos como referencia para crear eventos de prueba en un calendario secundario o para fijar datos (pin data) en el nodo 'Eventos de hoy'. Ajusta las fechas al día en que practiques.",
+  "eventos": [
+    {
+      "id": "demo-evento-1",
+      "status": "confirmed",
+      "summary": "Reunión de planificación semanal",
+      "location": "Sala 2",
+      "start": { "dateTime": "2026-11-17T09:00:00-06:00", "timeZone": "America/Mexico_City" },
+      "end": { "dateTime": "2026-11-17T10:00:00-06:00", "timeZone": "America/Mexico_City" }
+    },
+    {
+      "id": "demo-evento-2",
+      "status": "confirmed",
+      "summary": "Cumpleaños de Ana",
+      "start": { "date": "2026-11-17" },
+      "end": { "date": "2026-11-18" }
+    },
+    {
+      "id": "demo-evento-3",
+      "status": "confirmed",
+      "summary": "Clase de inglés",
+      "location": "En línea",
+      "start": { "dateTime": "2026-11-17T12:30:00-06:00", "timeZone": "America/Mexico_City" },
+      "end": { "dateTime": "2026-11-17T13:30:00-06:00", "timeZone": "America/Mexico_City" }
+    },
+    {
+      "id": "demo-evento-4",
+      "status": "confirmed",
+      "summary": "Sesión de estudio: Módulo 05 del taller",
+      "start": { "dateTime": "2026-11-17T18:00:00-06:00", "timeZone": "America/Mexico_City" },
+      "end": { "dateTime": "2026-11-17T19:30:00-06:00", "timeZone": "America/Mexico_City" }
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "name": "08 - Workflow de errores (Error Trigger)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 08 - Workflow de errores\nSe ejecuta automáticamente cuando **otro workflow publicado** falla.\n\nConfiguración: abre el workflow que quieras vigilar > **Settings** > **Error workflow** > elige este workflow.\n\nAmplíalo con un nodo Telegram o Gmail para recibir avisos (el proyecto final lo hace).",
+        "height": 260,
+        "width": 520
+      },
+      "id": "7abb0cad-51b1-58e0-b637-72fb737342ee",
+      "name": "Nota 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -320
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "3a438621-0022-508a-b33b-fe97859dc40c",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "40d4a6d7-8625-5f47-96b5-c7e74b2e672b",
+              "name": "workflow",
+              "value": "={{ $json.workflow.name }}",
+              "type": "string"
+            },
+            {
+              "id": "117e2a99-721f-5630-a2ab-d5431e72b019",
+              "name": "nodoConError",
+              "value": "={{ $json.execution.lastNodeExecuted }}",
+              "type": "string"
+            },
+            {
+              "id": "a831cb85-a6e6-5c38-96e5-ffdec8467a01",
+              "name": "mensaje",
+              "value": "={{ $json.execution.error.message }}",
+              "type": "string"
+            },
+            {
+              "id": "f822aaa5-30f9-5442-9102-fdc7b28d552f",
+              "name": "urlEjecucion",
+              "value": "={{ $json.execution.url }}",
+              "type": "string"
+            },
+            {
+              "id": "9b399dcc-ebd6-5995-b2ec-b16e037cf124",
+              "name": "momento",
+              "value": "={{ $now.toFormat('yyyy-MM-dd HH:mm:ss') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "98f9efff-fc4a-50e5-b65f-9c17cb8dcf08",
+      "name": "Formatear aviso",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        220,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Formatear aviso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

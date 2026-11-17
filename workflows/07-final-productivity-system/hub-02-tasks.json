@@ -1,0 +1,532 @@
+{
+  "name": "Hub 2 - Módulo de tareas",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Sub-workflow: tareas\nRecibe `{ texto, chatId, config }` del router y devuelve `{ chatId, respuesta }`.\nMisma lógica que el Proyecto A.\n\nAsigna la credencial de Google Sheets en los 4 nodos de Sheets.",
+        "height": 220,
+        "width": 520
+      },
+      "id": "a72d33c9-fbf3-56a6-95a2-f858a480c09c",
+      "name": "Nota 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -560
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "3e7e0ade-4bf1-5d81-ba90-23d902eab29a",
+      "name": "Entrada del router",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---------------------------------------------------------------\n// Interpreta el texto recibido y decide la acción sobre las tareas.\n// Devuelve un objeto con \"accion\": crear | listar | actualizar | ayuda | error\n// ---------------------------------------------------------------\nconst PRIORIDADES = ['alta', 'media', 'baja'];\nconst ESTADOS = ['pendiente', 'en_progreso', 'completada'];\nconst SINONIMOS_ESTADO = {\n  pendiente: 'pendiente',\n  progreso: 'en_progreso',\n  en_progreso: 'en_progreso',\n  enprogreso: 'en_progreso',\n  completada: 'completada',\n  completa: 'completada',\n  hecha: 'completada',\n  terminada: 'completada',\n};\n\nconst AYUDA = [\n  'Gestor de tareas - comandos:',\n  '/nueva Título | prioridad | AAAA-MM-DD',\n  '   prioridad opcional: alta, media o baja (por defecto media)',\n  '   fecha límite opcional en formato AAAA-MM-DD',\n  '/tareas - tus tareas pendientes',\n  '/tareas todas - incluye las completadas',\n  '/estado ID estado - pendiente, en_progreso o completada',\n  '/hecha ID - marca la tarea como completada',\n  '',\n  'Un texto sin comando crea una tarea rápida con prioridad media.',\n].join('\\n');\n\nconst normalizar = (t) => String(t || '')\n  .normalize('NFD').replace(/[̀-ͯ]/g, '')\n  .trim().toLowerCase();\n\nfunction crearTarea(argumentos, base) {\n  const partes = argumentos.split('|').map((p) => p.trim());\n  const titulo = partes[0] || '';\n  if (titulo.length < 3) {\n    return { ...base, accion: 'error', respuesta: 'El título debe tener al menos 3 caracteres.\\nEjemplo: /nueva Preparar presentación | alta | 2026-12-01' };\n  }\n  if (titulo.length > 200) {\n    return { ...base, accion: 'error', respuesta: 'El título no puede superar 200 caracteres.' };\n  }\n  const prioridad = partes[1] ? normalizar(partes[1]) : 'media';\n  if (!PRIORIDADES.includes(prioridad)) {\n    return { ...base, accion: 'error', respuesta: `Prioridad no válida: \"${partes[1]}\". Usa alta, media o baja.` };\n  }\n  let fechaLimite = '';\n  if (partes[2]) {\n    const fecha = DateTime.fromISO(partes[2]);\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(partes[2]) || !fecha.isValid) {\n      return { ...base, accion: 'error', respuesta: `Fecha no válida: \"${partes[2]}\". Usa el formato AAAA-MM-DD, por ejemplo 2026-12-01.` };\n    }\n    if (fecha < $now.startOf('day')) {\n      return { ...base, accion: 'error', respuesta: 'La fecha límite no puede estar en el pasado.' };\n    }\n    fechaLimite = fecha.toFormat('yyyy-MM-dd');\n  }\n  const ahora = $now.toFormat('yyyy-MM-dd HH:mm');\n  return {\n    ...base,\n    accion: 'crear',\n    id: 'T-' + Date.now().toString(36).slice(-6).toUpperCase(),\n    titulo,\n    prioridad,\n    fecha_limite: fechaLimite,\n    estado: 'pendiente',\n    creada_en: ahora,\n    actualizada_en: ahora,\n    chat_id: base.chatId,\n  };\n}\n\nfunction cambiarEstado(argumentos, base) {\n  const [idTexto, ...resto] = argumentos.split(/\\s+/).filter(Boolean);\n  const id = String(idTexto || '').toUpperCase();\n  if (!/^T-[A-Z0-9]{4,8}$/.test(id)) {\n    return { ...base, accion: 'error', respuesta: 'Indica un ID válido, por ejemplo: /estado T-4F9K2A en_progreso\\nConsulta los IDs con /tareas' };\n  }\n  const estado = SINONIMOS_ESTADO[normalizar(resto.join('_'))];\n  if (!estado || !ESTADOS.includes(estado)) {\n    return { ...base, accion: 'error', respuesta: 'Estado no válido. Usa: pendiente, en_progreso o completada.' };\n  }\n  return { ...base, accion: 'actualizar', id, estado };\n}\n\nfunction interpretarTarea(textoOriginal, chatId) {\n  const base = { chatId: String(chatId || '') };\n  const texto = String(textoOriginal || '').trim();\n  if (!texto) {\n    return { ...base, accion: 'error', respuesta: 'Solo puedo procesar mensajes de texto.\\n\\n' + AYUDA };\n  }\n  const primera = texto.split(/\\s+/)[0];\n  const comando = primera.startsWith('/') ? primera.toLowerCase().split('@')[0] : null;\n  const argumentos = comando ? texto.slice(primera.length).trim() : texto;\n\n  if (['/start', '/ayuda', '/help'].includes(comando)) return { ...base, accion: 'ayuda', respuesta: AYUDA };\n  if (comando === null || comando === '/nueva') return crearTarea(argumentos, base);\n  if (comando === '/tareas') return { ...base, accion: 'listar', incluirCompletadas: normalizar(argumentos) === 'todas' };\n  if (comando === '/hecha') return cambiarEstado(`${argumentos} completada`, base);\n  if (comando === '/estado') return cambiarEstado(argumentos, base);\n  return { ...base, accion: 'error', respuesta: `Comando no reconocido: ${comando}\\n\\n${AYUDA}` };\n}\n\n// Datos enviados por el router principal\nconst entrada = $('Entrada del router').first().json;\nreturn [{ json: interpretarTarea(entrada.texto, entrada.chatId) }];"
+      },
+      "id": "0c5fbfb3-8ffe-5ede-8eea-a556c5095001",
+      "name": "Interpretar tarea",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "c187d05a-3876-5a82-83cd-51dd0420a5ec",
+                    "leftValue": "={{ $json.accion }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "crear"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "crear"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "d8687f83-071e-5782-8c30-a6cd41e30f6d",
+                    "leftValue": "={{ $json.accion }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "listar"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "listar"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "f0419081-41c5-5439-93bb-4a43da0b46c8",
+                    "leftValue": "={{ $json.accion }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "actualizar"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "actualizar"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Respuesta directa"
+        }
+      },
+      "id": "7a62b68d-fd71-5449-826c-05336ccf2173",
+      "name": "Según la acción",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.5,
+      "position": [
+        460,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Entrada del router').first().json.config.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Tareas",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW",
+          "handlingExtraData": "ignoreIt"
+        }
+      },
+      "id": "90da493e-28c0-5633-a3c0-1a480a425c1b",
+      "name": "Guardar tarea",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        720,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construye el mensaje de confirmación a partir de la tarea interpretada.\nconst t = $('Interpretar tarea').first().json;\nconst lineas = [\n  'Tarea creada',\n  `ID: ${t.id}`,\n  `Título: ${t.titulo}`,\n  `Prioridad: ${t.prioridad}`,\n  `Fecha límite: ${t.fecha_limite || 'sin fecha'}`,\n  '',\n  `Para completarla: /hecha ${t.id}`,\n];\nreturn [{ json: { chatId: t.chatId, respuesta: lineas.join('\\n') } }];"
+      },
+      "id": "8d28bb1c-6d25-5251-a517-b2c7156f071f",
+      "name": "Confirmar creación",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Entrada del router').first().json.config.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Tareas",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "59d1cc3d-b159-55c5-badf-693d41bcc54f",
+      "name": "Leer tareas",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        720,
+        -100
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filtra las tareas del chat, las ordena y construye el listado.\nconst peticion = $('Interpretar tarea').first().json;\nconst filas = $input.all().map((i) => i.json).filter((f) => f && f.id);\n\nconst propias = filas.filter((f) => String(f.chat_id) === String(peticion.chatId));\nconst visibles = propias.filter((f) => peticion.incluirCompletadas || f.estado !== 'completada');\n\nconst ordenPrioridad = { alta: 0, media: 1, baja: 2 };\nvisibles.sort((a, b) =>\n  (ordenPrioridad[a.prioridad] ?? 3) - (ordenPrioridad[b.prioridad] ?? 3) ||\n  String(a.fecha_limite || '9999-12-31').localeCompare(String(b.fecha_limite || '9999-12-31')));\n\nif (visibles.length === 0) {\n  return [{ json: { chatId: peticion.chatId, total: 0, respuesta: 'No tienes tareas pendientes. Crea una con /nueva Título' } }];\n}\n\nconst hoy = $now.toFormat('yyyy-MM-dd');\nconst MAX = 25;\nconst lineas = visibles.slice(0, MAX).map((t) => {\n  const fecha = t.fecha_limite ? ` | vence ${t.fecha_limite}${t.fecha_limite < hoy && t.estado !== 'completada' ? ' (VENCIDA)' : ''}` : '';\n  return `${t.id} [${t.prioridad}] ${t.titulo} - ${t.estado}${fecha}`;\n});\nconst titulo = peticion.incluirCompletadas ? 'Todas tus tareas' : 'Tus tareas pendientes';\nlet respuesta = `${titulo} (${visibles.length}):\\n\\n${lineas.join('\\n')}`;\nif (visibles.length > MAX) respuesta += `\\n\\n... y ${visibles.length - MAX} más.`;\n\nreturn [{ json: { chatId: peticion.chatId, total: visibles.length, respuesta } }];"
+      },
+      "id": "454b883e-e3c4-5458-b452-90e70d3fcfda",
+      "name": "Formatear lista",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Entrada del router').first().json.config.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Tareas",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "f2dff599-fd4b-5efd-9c89-61b2a7567ff4",
+      "name": "Leer tareas para actualizar",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        720,
+        120
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Busca la tarea por ID dentro de las tareas del mismo chat.\nconst peticion = $('Interpretar tarea').first().json;\nconst filas = $input.all().map((i) => i.json).filter((f) => f && f.id);\nconst tarea = filas.find((f) =>\n  String(f.id).toUpperCase() === peticion.id && String(f.chat_id) === String(peticion.chatId));\n\nif (!tarea) {\n  return [{ json: {\n    encontrada: false,\n    chatId: peticion.chatId,\n    respuesta: `No encontré la tarea ${peticion.id}. Consulta tus tareas con /tareas`,\n  } }];\n}\n\n// Solo se envían a Google Sheets la columna clave (id) y las columnas que cambian.\nreturn [{ json: {\n  encontrada: true,\n  id: tarea.id,\n  estado: peticion.estado,\n  actualizada_en: $now.toFormat('yyyy-MM-dd HH:mm'),\n  chatId: peticion.chatId,\n  titulo: tarea.titulo,\n  estadoAnterior: tarea.estado,\n} }];"
+      },
+      "id": "e61f6164-7080-5f44-9382-b2c09ad35d26",
+      "name": "Buscar tarea",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "6523977a-7d2d-5e05-8657-ac575f6546c1",
+              "leftValue": "={{ $json.encontrada }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "6fa129fa-6fc0-5776-8b31-a05d858ad345",
+      "name": "¿Tarea encontrada?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1180,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Entrada del router').first().json.config.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Tareas",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW",
+          "handlingExtraData": "ignoreIt"
+        }
+      },
+      "id": "1dd4ca98-27a1-5c13-982f-30367739c26a",
+      "name": "Actualizar estado",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1400,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mensaje de confirmación del cambio de estado.\nconst t = $('Buscar tarea').first().json;\nreturn [{ json: {\n  chatId: t.chatId,\n  respuesta: `Tarea ${t.id} actualizada\\n${t.titulo}\\nEstado: ${t.estadoAnterior} -> ${t.estado}`,\n} }];"
+      },
+      "id": "e166b2eb-7fc2-52a7-b93d-edb4a7cd39eb",
+      "name": "Confirmar actualización",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1620,
+        60
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "09dcb61c-7322-578f-8613-db93c8c75e2e",
+      "name": "Salida",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1880,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Según la acción": {
+      "main": [
+        [
+          {
+            "node": "Guardar tarea",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Leer tareas",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Leer tareas para actualizar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar tarea": {
+      "main": [
+        [
+          {
+            "node": "Confirmar creación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer tareas": {
+      "main": [
+        [
+          {
+            "node": "Formatear lista",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer tareas para actualizar": {
+      "main": [
+        [
+          {
+            "node": "Buscar tarea",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar tarea": {
+      "main": [
+        [
+          {
+            "node": "¿Tarea encontrada?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Tarea encontrada?": {
+      "main": [
+        [
+          {
+            "node": "Actualizar estado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Actualizar estado": {
+      "main": [
+        [
+          {
+            "node": "Confirmar actualización",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entrada del router": {
+      "main": [
+        [
+          {
+            "node": "Interpretar tarea",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Interpretar tarea": {
+      "main": [
+        [
+          {
+            "node": "Según la acción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirmar creación": {
+      "main": [
+        [
+          {
+            "node": "Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear lista": {
+      "main": [
+        [
+          {
+            "node": "Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirmar actualización": {
+      "main": [
+        [
+          {
+            "node": "Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

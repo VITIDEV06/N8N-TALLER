@@ -1,0 +1,102 @@
+{
+  "name": "02 - Schedule Trigger",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 02 - Schedule Trigger\nSe ejecuta todos los días a las 08:00 cuando el workflow está **publicado**.\n\nPara probarlo sin esperar, pulsa **Execute workflow**: n8n ejecuta el trigger una vez.\n\nLa hora usa la zona horaria `GENERIC_TIMEZONE`.",
+        "height": 240,
+        "width": 460
+      },
+      "id": "570b5348-b352-59b8-a0bb-efbd6f7c55c8",
+      "name": "Nota 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -280
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "3b925436-205f-5326-98e9-666b211f580c",
+      "name": "Cada día a las 08:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "55b2e485-8f76-5367-9f49-057df577530e",
+              "name": "ejecutadoEn",
+              "value": "={{ $now.toFormat('yyyy-MM-dd HH:mm:ss') }}",
+              "type": "string"
+            },
+            {
+              "id": "84067204-77c4-5263-b62c-eac6124c6863",
+              "name": "diaSemana",
+              "value": "={{ $now.setLocale('es').toFormat('cccc') }}",
+              "type": "string"
+            },
+            {
+              "id": "cc1d493f-9b2d-5a1f-be06-032c92d3e8df",
+              "name": "esFinDeSemana",
+              "value": "={{ $now.weekday >= 6 }}",
+              "type": "boolean"
+            },
+            {
+              "id": "d5032044-bc51-507a-a674-3b4f13d7f6cb",
+              "name": "zonaHoraria",
+              "value": "={{ $now.zoneName }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3caf7a9d-a2f6-59e6-b298-8c693c330d63",
+      "name": "Datos de la ejecución",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        220,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Cada día a las 08:00": {
+      "main": [
+        [
+          {
+            "node": "Datos de la ejecución",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

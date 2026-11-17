@@ -1,0 +1,262 @@
+{
+  "name": "Proyecto B - Daily Productivity Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Proyecto B - Daily Productivity Assistant\nCada día a las 07:00 consulta Google Calendar y las tareas pendientes, construye un resumen y lo envía por Telegram.\n\n**Antes de usarlo:**\n1. Rellena **Configuración** (`chatId`, `spreadsheetId`, `calendarId`).\n2. Credenciales: Google Calendar, Google Sheets y Telegram.\n3. Si no usas el Proyecto A, pon `incluirTareas` en `false` y desactiva **Tareas pendientes**.\n\nNo necesita túnel HTTPS.",
+        "height": 300,
+        "width": 620
+      },
+      "id": "12bbbda0-8348-5e6b-912f-2016c6436363",
+      "name": "Nota 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -520
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "id": "02f1b1ee-d989-5069-9c9f-da2e20236e8b",
+      "name": "Cada día a las 07:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        -80
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "ef60c06d-7e5a-56fb-93ab-6d289906fd7a",
+      "name": "Probar ahora",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4bb1ee64-8c6b-5efd-8890-5389cd4aa9d2",
+              "name": "chatId",
+              "value": "REEMPLAZAR_CON_TU_CHAT_ID",
+              "type": "string"
+            },
+            {
+              "id": "a8e85b03-da6a-5fe6-a11a-b08d901ea5ea",
+              "name": "calendarId",
+              "value": "primary",
+              "type": "string"
+            },
+            {
+              "id": "b6f92d18-c11d-5236-b391-2b60874eb276",
+              "name": "spreadsheetId",
+              "value": "REEMPLAZAR_CON_EL_ID_DE_TU_HOJA",
+              "type": "string"
+            },
+            {
+              "id": "ccb5a123-8c85-5cd1-a7b9-45bd349aed3a",
+              "name": "incluirTareas",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "c55f828b-22e0-51d8-b253-f6b00969e5b9",
+              "name": "inicioJornada",
+              "value": "08:00",
+              "type": "string"
+            },
+            {
+              "id": "802b0edc-35b9-59e4-96c7-1d8fc8b9b11d",
+              "name": "finJornada",
+              "value": "20:00",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e5051cde-bc4e-544b-b4c8-774a102a01e7",
+      "name": "Configuración",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "={{ $('Configuración').first().json.calendarId }}",
+          "mode": "id"
+        },
+        "returnAll": true,
+        "timeMin": "={{ $now.startOf('day').toISO() }}",
+        "timeMax": "={{ $now.endOf('day').toISO() }}",
+        "options": {
+          "orderBy": "startTime",
+          "recurringEventHandling": "expand"
+        }
+      },
+      "id": "54ac86fa-c83a-5c5a-972e-a6d0a23a8487",
+      "name": "Eventos de hoy",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.4,
+      "position": [
+        460,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Configuración').first().json.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Tareas",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "320f9e93-4b64-5e28-9837-6e6b3ae08056",
+      "name": "Tareas pendientes",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        680,
+        0
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---------------------------------------------------------------\n// Construye el resumen diario a partir de los eventos del calendario\n// y, opcionalmente, de las tareas pendientes de Google Sheets.\n// ---------------------------------------------------------------\nconst zona = $now.zoneName;\nconst hoy = $now.startOf('day');\nconst hoyTexto = hoy.toFormat('yyyy-MM-dd');\n\nfunction leerNodo(nombre) {\n  try {\n    return $(nombre).all().map((i) => i.json);\n  } catch (error) {\n    return []; // el nodo no se ejecutó o está desactivado\n  }\n}\n\nfunction hora(dt) {\n  return dt.toFormat('HH:mm');\n}\n\nfunction construirResumen(config, eventosRaw, tareasRaw) {\n  // 1. Normalizar eventos (los de día completo usan start.date)\n  const eventos = eventosRaw\n    .filter((e) => e && e.start && e.status !== 'cancelled')\n    .map((e) => {\n      const todoElDia = !e.start.dateTime;\n      const inicio = todoElDia ? DateTime.fromISO(e.start.date, { zone: zona }) : DateTime.fromISO(e.start.dateTime).setZone(zona);\n      const fin = todoElDia ? DateTime.fromISO(e.end?.date || e.start.date, { zone: zona }) : DateTime.fromISO(e.end?.dateTime || e.start.dateTime).setZone(zona);\n      return { titulo: e.summary || '(sin título)', lugar: e.location || '', todoElDia, inicio, fin };\n    })\n    .sort((a, b) => (a.todoElDia === b.todoElDia ? a.inicio - b.inicio : a.todoElDia ? -1 : 1));\n\n  // 2. Huecos libres dentro de la jornada\n  const [hIni, mIni] = String(config.inicioJornada || '08:00').split(':').map(Number);\n  const [hFin, mFin] = String(config.finJornada || '20:00').split(':').map(Number);\n  const inicioJornada = hoy.set({ hour: hIni, minute: mIni || 0 });\n  const finJornada = hoy.set({ hour: hFin, minute: mFin || 0 });\n  const huecos = [];\n  let cursor = inicioJornada;\n  for (const ev of eventos.filter((e) => !e.todoElDia)) {\n    if (ev.inicio > cursor) huecos.push({ desde: cursor, hasta: ev.inicio < finJornada ? ev.inicio : finJornada });\n    if (ev.fin > cursor) cursor = ev.fin;\n  }\n  if (cursor < finJornada) huecos.push({ desde: cursor, hasta: finJornada });\n  const huecosUtiles = huecos.filter((h) => h.hasta.diff(h.desde, 'minutes').minutes >= 30);\n\n  // 3. Tareas pendientes del chat configurado\n  const tareas = tareasRaw\n    .filter((t) => t && t.id && t.estado !== 'completada')\n    .filter((t) => !config.chatId || String(t.chat_id) === String(config.chatId));\n  const vencidas = tareas.filter((t) => t.fecha_limite && t.fecha_limite < hoyTexto);\n  const paraHoy = tareas.filter((t) => t.fecha_limite === hoyTexto);\n  const altas = tareas.filter((t) => t.prioridad === 'alta' && !vencidas.includes(t) && !paraHoy.includes(t));\n\n  // 4. Mensaje\n  const fechaLarga = $now.setLocale('es').toFormat(\"cccc d 'de' LLLL\");\n  const lineas = [`Resumen del ${fechaLarga}`, ''];\n\n  lineas.push(`AGENDA (${eventos.length} ${eventos.length === 1 ? 'evento' : 'eventos'})`);\n  if (eventos.length === 0) lineas.push('- Sin eventos en el calendario.');\n  for (const ev of eventos) {\n    const franja = ev.todoElDia ? 'Todo el día' : `${hora(ev.inicio)}-${hora(ev.fin)}`;\n    lineas.push(`- ${franja}  ${ev.titulo}${ev.lugar ? ` (${ev.lugar})` : ''}`);\n  }\n\n  lineas.push('', 'TIEMPO LIBRE EN TU JORNADA');\n  if (huecosUtiles.length === 0) lineas.push('- Sin huecos de 30 minutos o más.');\n  for (const h of huecosUtiles) {\n    const minutos = Math.round(h.hasta.diff(h.desde, 'minutes').minutes);\n    const duracion = minutos >= 60 ? `${Math.floor(minutos / 60)} h ${minutos % 60 ? (minutos % 60) + ' min' : ''}`.trim() : `${minutos} min`;\n    lineas.push(`- ${hora(h.desde)}-${hora(h.hasta)} (${duracion})`);\n  }\n\n  if (config.incluirTareas) {\n    lineas.push('', 'TAREAS');\n    lineas.push(`Vencidas: ${vencidas.length} | Para hoy: ${paraHoy.length} | Pendientes: ${tareas.length}`);\n    const destacadas = [...vencidas, ...paraHoy, ...altas].slice(0, 8);\n    for (const t of destacadas) {\n      const marca = vencidas.includes(t) ? 'VENCIDA' : paraHoy.includes(t) ? 'hoy' : t.prioridad;\n      lineas.push(`- [${marca}] ${t.titulo} (${t.id})`);\n    }\n  }\n\n  return {\n    chatId: String(config.chatId || ''),\n    fecha: hoyTexto,\n    totalEventos: eventos.length,\n    totalTareasPendientes: tareas.length,\n    tareasVencidas: vencidas.length,\n    respuesta: lineas.join('\\n'),\n  };\n}\n\nconst config = $('Configuración').first().json;\nconst eventos = leerNodo('Eventos de hoy');\nconst tareas = config.incluirTareas ? leerNodo('Tareas pendientes') : [];\nreturn [{ json: construirResumen(config, eventos, tareas) }];"
+      },
+      "id": "e7394002-6a52-5f9a-a672-1bb40d9c38f8",
+      "name": "Construir resumen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.respuesta }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "81371572-8dc5-5bd9-97b6-65484ef818f1",
+      "name": "Enviar resumen",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1120,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Cada día a las 07:00": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Probar ahora": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuración": {
+      "main": [
+        [
+          {
+            "node": "Eventos de hoy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eventos de hoy": {
+      "main": [
+        [
+          {
+            "node": "Tareas pendientes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tareas pendientes": {
+      "main": [
+        [
+          {
+            "node": "Construir resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construir resumen": {
+      "main": [
+        [
+          {
+            "node": "Enviar resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

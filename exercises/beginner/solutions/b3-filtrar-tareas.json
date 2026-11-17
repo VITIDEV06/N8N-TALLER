@@ -1,0 +1,140 @@
+{
+  "name": "Solución B3 - Filtrar y ordenar tareas",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "57a99632-3836-55ac-a21a-10c37d6bff5f",
+      "name": "Ejecutar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  { titulo: 'Enviar informe', prioridad: 'alta', hecha: false },\n  { titulo: 'Reservar vuelo', prioridad: 'media', hecha: true },\n  { titulo: 'Llamar al dentista', prioridad: 'alta', hecha: false },\n  { titulo: 'Ordenar fotos', prioridad: 'baja', hecha: false },\n].map((t) => ({ json: t }));"
+      },
+      "id": "5a200ca6-e048-5ddf-8ae4-859332f166f1",
+      "name": "Tareas de ejemplo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "9a122177-019f-5971-a79f-ae225cd7e86d",
+              "leftValue": "={{ $json.hecha }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              },
+              "rightValue": ""
+            },
+            {
+              "id": "be708fe3-0a27-5be6-bb0b-2059ae38782e",
+              "leftValue": "={{ $json.prioridad }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "alta"
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "b7fd9423-a4d5-5a84-b2fc-5d811a46440a",
+      "name": "Solo pendientes de prioridad alta",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.4,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e5f40784-5e69-5b52-a82c-e1fbe9626a64",
+              "name": "linea",
+              "value": "={{ '[ALTA] ' + $json.titulo }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "828b2dac-4cf2-5979-99ee-51e02f514893",
+      "name": "Formatear",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        660,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Ejecutar manualmente": {
+      "main": [
+        [
+          {
+            "node": "Tareas de ejemplo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tareas de ejemplo": {
+      "main": [
+        [
+          {
+            "node": "Solo pendientes de prioridad alta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Solo pendientes de prioridad alta": {
+      "main": [
+        [
+          {
+            "node": "Formatear",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

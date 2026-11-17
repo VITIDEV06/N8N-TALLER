@@ -1,0 +1,382 @@
+{
+  "name": "Hub 5 - Módulo de notas con IA (opcional)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Sub-workflow: notas con IA (opcional)\nSe activa con `aiEnabled = true` en el router. Usa la misma configuración de IA (`useMockModel`, `apiBaseUrl`, `model`).\n\nAsigna la credencial Header Auth en *Llamar al modelo* y Google Sheets en *Guardar en Conocimiento*.",
+        "height": 220,
+        "width": 560
+      },
+      "id": "3baedd5c-541a-541b-87ab-2c5f0ea33078",
+      "name": "Nota 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -460
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "93ea119c-afaa-520e-b4b6-7bdabfccf458",
+      "name": "Entrada del router",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7c8e2cbd-5818-5be9-87c9-f860546fa0ee",
+              "name": "texto",
+              "value": "={{ $json.argumentos }}",
+              "type": "string"
+            },
+            {
+              "id": "b01dfc90-b059-5787-b8d2-da4e7644d2bd",
+              "name": "fuente",
+              "value": "telegram",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "24e9183c-ad86-5d67-9eb2-228160efc644",
+      "name": "Datos de la nota",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---------------------------------------------------------------\n// Valida la entrada y construye la petición para el modelo.\n// Acepta datos del Webhook (body.texto) o del Manual Trigger (texto).\n// ---------------------------------------------------------------\nconst config = $('Entrada del router').first().json.config;\nconst entrada = $input.first().json;\nconst datos = entrada.body && typeof entrada.body === 'object' ? entrada.body : entrada;\n\nconst texto = String(datos.texto || '').replace(/\\s+/g, ' ').trim();\nconst fuente = String(datos.fuente || 'manual').slice(0, 100);\nconst maximo = Number(config.maxInputChars) || 6000;\nconst categorias = String(config.categorias).split(',').map((c) => c.trim()).filter(Boolean);\n\nif (texto.length < 20) {\n  return [{ json: { valido: false, error: 'El campo \"texto\" es obligatorio y debe tener al menos 20 caracteres.' } }];\n}\n\nconst textoRecortado = texto.slice(0, maximo);\nconst instrucciones = [\n  'Eres un asistente que organiza información personal.',\n  'Analiza el texto del usuario y responde SOLO con un objeto JSON válido, sin texto adicional,',\n  'con exactamente estas claves:',\n  `- \"categoria\": una de [${categorias.join(', ')}]`,\n  '- \"titulo\": título breve de máximo 80 caracteres',\n  '- \"resumen\": resumen en español de máximo 3 frases',\n  '- \"puntos_clave\": lista de 1 a 5 frases cortas',\n  '- \"etiquetas\": lista de 1 a 5 palabras clave en minúsculas',\n  'No inventes datos que no estén en el texto.',\n].join('\\n');\n\nreturn [{ json: {\n  valido: true,\n  texto: textoRecortado,\n  recortado: texto.length > maximo,\n  fuente,\n  categorias,\n  requestBody: {\n    model: config.model,\n    temperature: 0.2,\n    messages: [\n      { role: 'system', content: instrucciones },\n      { role: 'user', content: textoRecortado },\n    ],\n  },\n} }];"
+      },
+      "id": "8192bde2-28fd-5ff3-aeb9-d4607612fd0c",
+      "name": "Preparar solicitud",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "34315279-f80f-54d8-aa48-366af40bc07e",
+              "leftValue": "={{ $json.valido }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "15612a08-0866-5c4b-8c3e-7d4cf342d9fc",
+      "name": "¿Entrada válida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "ec2e1e5b-f378-571e-bfac-9843daa07dbf",
+              "leftValue": "={{ $('Entrada del router').first().json.config.useMockModel }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "db130b8b-8546-5f9c-b13b-27fdd5cfa395",
+      "name": "¿Modo simulado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        880,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---------------------------------------------------------------\n// MODELO SIMULADO: reglas por palabras clave, NO es inteligencia artificial.\n// Devuelve el mismo formato que la API compatible con OpenAI para que\n// el resto del workflow funcione igual sin proveedor configurado.\n// ---------------------------------------------------------------\nconst { texto, categorias } = $input.first().json;\nconst minusculas = texto.toLowerCase();\nconst PISTAS = {\n  trabajo: ['reunión', 'cliente', 'proyecto', 'entrega', 'equipo', 'informe'],\n  estudio: ['curso', 'aprender', 'examen', 'tutorial', 'estudiar', 'clase'],\n  finanzas: ['pago', 'factura', 'presupuesto', 'ahorro', 'gasto'],\n  salud: ['ejercicio', 'médico', 'dormir', 'dieta', 'salud'],\n  ideas: ['idea', 'podría', 'proponer', 'mejorar'],\n};\nconst categoria = Object.keys(PISTAS).find((c) => categorias.includes(c) && PISTAS[c].some((p) => minusculas.includes(p)))\n  || (categorias.includes('referencia') ? 'referencia' : categorias[0]);\n\nconst frases = texto.split(/(?<=[.!?])\\s+/).filter((f) => f.length > 10);\nconst palabras = [...new Set(minusculas.match(/[a-záéíóúñ]{6,}/g) || [])].slice(0, 4);\n\nconst contenido = {\n  categoria,\n  titulo: (frases[0] || texto).slice(0, 80),\n  resumen: frases.slice(0, 2).join(' ') || texto.slice(0, 200),\n  puntos_clave: frases.slice(0, 3).map((f) => f.slice(0, 120)),\n  etiquetas: palabras,\n};\n\nreturn [{ json: {\n  model: 'simulado',\n  choices: [{ index: 0, message: { role: 'assistant', content: JSON.stringify(contenido) } }],\n} }];"
+      },
+      "id": "3d4dd6cc-7d25-57fc-a61d-1f32d7c2ec05",
+      "name": "Modelo simulado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Entrada del router').first().json.config.apiBaseUrl }}/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "9481e7e1-3f99-597e-9150-4591520b622f",
+      "name": "Llamar al modelo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1120,
+        -20
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---------------------------------------------------------------\n// La salida de un modelo es texto NO confiable: se extrae el JSON,\n// se valida su estructura y se normalizan los campos antes de guardar.\n// ---------------------------------------------------------------\nconst preparado = $('Preparar solicitud').first().json;\nconst respuesta = $input.first().json;\nconst contenido = String(respuesta.choices?.[0]?.message?.content || '');\nconst modelo = String(respuesta.model || 'desconocido');\n\nfunction extraerJson(texto) {\n  const limpio = texto.replace(/```(?:json)?/gi, '').trim();\n  const inicio = limpio.indexOf('{');\n  const fin = limpio.lastIndexOf('}');\n  if (inicio === -1 || fin <= inicio) throw new Error('La respuesta no contiene un objeto JSON');\n  return JSON.parse(limpio.slice(inicio, fin + 1));\n}\n\nconst lista = (v, max) => (Array.isArray(v) ? v : [])\n  .map((x) => String(x).trim()).filter(Boolean).slice(0, max);\n\nconst errores = [];\nlet datos = {};\ntry {\n  datos = extraerJson(contenido);\n} catch (error) {\n  errores.push(`JSON no válido: ${error.message}`);\n}\n\nlet categoria = String(datos.categoria || '').toLowerCase().trim();\nif (!preparado.categorias.includes(categoria)) {\n  if (categoria) errores.push(`Categoría desconocida \"${categoria}\"`);\n  categoria = 'referencia';\n}\nconst resumen = String(datos.resumen || '').trim().slice(0, 600);\nif (!resumen) errores.push('Falta el resumen');\nconst puntos = lista(datos.puntos_clave, 5);\nif (puntos.length === 0) errores.push('Faltan los puntos clave');\n\nreturn [{ json: {\n  valido: errores.length === 0,\n  errores: errores.join('; '),\n  id: 'K-' + Date.now().toString(36).toUpperCase(),\n  fecha: $now.toFormat('yyyy-MM-dd HH:mm'),\n  fuente: preparado.fuente,\n  categoria,\n  titulo: String(datos.titulo || '').trim().slice(0, 80) || preparado.texto.slice(0, 80),\n  resumen,\n  puntos_clave: puntos.join(' | '),\n  etiquetas: lista(datos.etiquetas, 5).map((e) => e.toLowerCase()).join(', '),\n  modelo,\n  estado: errores.length === 0 ? 'ok' : 'revisar',\n  texto_original: preparado.texto.slice(0, 1000),\n} }];"
+      },
+      "id": "e8d69d1b-7323-52f2-b416-99916ed39f84",
+      "name": "Validar respuesta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Entrada del router').first().json.config.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Conocimiento",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW",
+          "handlingExtraData": "ignoreIt"
+        }
+      },
+      "id": "d418ea75-a05d-5a35-8f04-999f99bfb011",
+      "name": "Guardar en Conocimiento",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1580,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mensaje para Telegram con el resultado de la clasificación.\nconst r = $('Validar respuesta').first().json;\nconst entrada = $('Entrada del router').first().json;\nconst lineas = [\n  `Nota guardada (${r.id})`,\n  `Categoría: ${r.categoria}`,\n  `Título: ${r.titulo}`,\n  '',\n  r.resumen,\n  '',\n  ...r.puntos_clave.split(' | ').filter(Boolean).map((p) => `- ${p}`),\n];\nif (r.estado !== 'ok') lineas.push('', `Aviso: revisar resultado (${r.errores})`);\nreturn [{ json: { chatId: entrada.chatId, respuesta: lineas.join('\\n') } }];"
+      },
+      "id": "15fdcf75-6e7f-5b47-9db4-8f4dbf709f6c",
+      "name": "Respuesta para Telegram",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const entrada = $('Entrada del router').first().json;\nreturn [{ json: { chatId: entrada.chatId, respuesta: 'Escribe la nota después del comando. Ejemplo:\\n/nota Idea: automatizar el informe semanal con n8n' } }];"
+      },
+      "id": "3f26e335-000c-51d7-a5d4-2fc5a6357453",
+      "name": "Respuesta de error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        160
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Preparar solicitud": {
+      "main": [
+        [
+          {
+            "node": "¿Entrada válida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Entrada válida?": {
+      "main": [
+        [
+          {
+            "node": "¿Modo simulado?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta de error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Modo simulado?": {
+      "main": [
+        [
+          {
+            "node": "Modelo simulado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Llamar al modelo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modelo simulado": {
+      "main": [
+        [
+          {
+            "node": "Validar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Llamar al modelo": {
+      "main": [
+        [
+          {
+            "node": "Validar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar respuesta": {
+      "main": [
+        [
+          {
+            "node": "Guardar en Conocimiento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entrada del router": {
+      "main": [
+        [
+          {
+            "node": "Datos de la nota",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos de la nota": {
+      "main": [
+        [
+          {
+            "node": "Preparar solicitud",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar en Conocimiento": {
+      "main": [
+        [
+          {
+            "node": "Respuesta para Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

@@ -1,0 +1,135 @@
+{
+  "name": "07 - Prueba de conexión con Google Sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 07 - Prueba de conexión con Google Sheets\n1. Pega el ID de tu hoja en **Configuración**.\n2. Selecciona tu credencial en **Leer pestaña Tareas**.\n3. Pulsa **Execute workflow**.\n\nGuía: `guides/google-sheets-setup.md`",
+        "height": 240,
+        "width": 480
+      },
+      "id": "973a8af7-bc4d-50c8-b705-b220c0270de5",
+      "name": "Nota 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -300
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "e9e1da2f-954b-5fa6-83e5-9807bf6540d7",
+      "name": "Ejecutar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d24194b1-6bed-5a9d-b876-7717f89ac628",
+              "name": "spreadsheetId",
+              "value": "REEMPLAZAR_CON_EL_ID_DE_TU_HOJA",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "79b59a8f-5c27-5b45-8b3c-ae67e8576925",
+      "name": "Configuración",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Configuración').first().json.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Tareas",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "7634c613-cd7a-5988-b3e8-161223baf85f",
+      "name": "Leer pestaña Tareas",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const filas = $input.all().map((i) => i.json);\nreturn [{ json: {\n  conexion: 'correcta',\n  filasLeidas: filas.length,\n  columnas: filas.length ? Object.keys(filas[0]) : [],\n} }];"
+      },
+      "id": "f13ee87e-26cc-564b-906b-8334bbb11550",
+      "name": "Contar filas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Ejecutar manualmente": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuración": {
+      "main": [
+        [
+          {
+            "node": "Leer pestaña Tareas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer pestaña Tareas": {
+      "main": [
+        [
+          {
+            "node": "Contar filas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

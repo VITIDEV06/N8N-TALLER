@@ -1,0 +1,379 @@
+{
+  "name": "Proyecto C - Smart Email Organizer",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Proyecto C - Smart Email Organizer\nCada 5 minutos revisa los correos nuevos, los clasifica con reglas, aplica una etiqueta de Gmail y registra el resultado en Google Sheets.\n\n**Antes de usarlo:**\n1. Crea en Gmail las etiquetas `n8n/Importante`, `n8n/Tareas`, `n8n/Notificaciones`, `n8n/Newsletters`.\n2. Credencial Gmail en el trigger y en los 4 nodos *Etiquetar*; elige en cada uno su etiqueta.\n3. Credencial Google Sheets y `spreadsheetId` en **Configuración**.\n4. Opcional: `remitentesImportantes` separados por comas.\n\nSolo lee y etiqueta: no borra ni envía correos.",
+        "height": 360,
+        "width": 640
+      },
+      "id": "f187221c-10ba-5806-b143-b7d5eee94965",
+      "name": "Nota 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -620
+      ]
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 5,
+              "unit": "minutes"
+            }
+          ]
+        },
+        "simple": true,
+        "filters": {
+          "q": "in:inbox"
+        }
+      },
+      "id": "2a568c9f-d5fb-53cb-b914-a01af673016f",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7d246ebf-c40b-5347-960b-cc14c43351ac",
+              "name": "spreadsheetId",
+              "value": "REEMPLAZAR_CON_EL_ID_DE_TU_HOJA",
+              "type": "string"
+            },
+            {
+              "id": "feff0ea4-f2cf-599d-8605-b1da2963adbc",
+              "name": "remitentesImportantes",
+              "value": "jefa@empresa-ficticia.com,banco-ficticio.com",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "98a05aa6-b10c-554e-abc7-99c1bd27f90a",
+      "name": "Configuración",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---------------------------------------------------------------\n// Clasifica cada correo mediante reglas explicables (sin IA).\n// Categorías: importante | tarea | notificacion | newsletter | otros\n// Funciona con la salida simplificada del Gmail Trigger\n// (campos From, Subject, snippet, id).\n// ---------------------------------------------------------------\nconst normalizar = (t) => String(t || '')\n  .normalize('NFD').replace(/[̀-ͯ]/g, '')\n  .toLowerCase();\n\nconst config = $('Configuración').first().json;\nconst remitentesImportantes = String(config.remitentesImportantes || '')\n  .split(',').map((r) => normalizar(r).trim()).filter(Boolean);\n\nconst REGLAS = {\n  newsletter: ['newsletter', 'boletin', 'darte de baja', 'darse de baja', 'unsubscribe', 'cancelar suscripcion', 'resumen semanal', 'digest'],\n  notificacionRemitente: ['no-reply', 'noreply', 'no_reply', 'notifications', 'notificaciones', 'alerts', 'alertas', 'mailer-daemon'],\n  notificacionAsunto: ['notificacion', 'alerta', 'confirmacion', 'tu pedido', 'recibo', 'inicio de sesion', 'codigo de verificacion', 'verification code', 'password reset'],\n  importante: ['urgente', 'importante', 'asap', 'fecha limite', 'vence hoy', 'vencimiento', 'accion requerida', 'action required'],\n  tarea: ['por favor', 'podrias', 'puedes', 'necesito que', 'pendiente', 'revisar', 'revision', 'enviar antes', 'to do', 'tarea', 'solicitud'],\n};\n\nconst contiene = (texto, palabras) => palabras.find((p) => texto.includes(p));\n\nfunction extraerDireccion(remitente) {\n  const coincidencia = String(remitente || '').match(/<([^>]+)>/);\n  return normalizar(coincidencia ? coincidencia[1] : remitente).trim();\n}\n\nfunction clasificar(correo) {\n  const remitente = correo.From || correo.from?.text || correo.from || '';\n  const direccion = extraerDireccion(remitente);\n  const asunto = correo.Subject || correo.subject || '';\n  const texto = normalizar(`${asunto} ${correo.snippet || correo.text || ''}`);\n\n  let categoria = 'otros';\n  let motivo = 'No coincide con ninguna regla';\n  let palabra;\n\n  if (remitentesImportantes.some((r) => direccion.includes(r))) {\n    categoria = 'importante'; motivo = 'Remitente marcado como importante';\n  } else if ((palabra = contiene(texto, REGLAS.newsletter))) {\n    categoria = 'newsletter'; motivo = `Contiene \"${palabra}\"`;\n  } else if ((palabra = contiene(direccion, REGLAS.notificacionRemitente))) {\n    categoria = 'notificacion'; motivo = `Remitente automático (${palabra})`;\n  } else if ((palabra = contiene(texto, REGLAS.importante))) {\n    categoria = 'importante'; motivo = `Contiene \"${palabra}\"`;\n  } else if ((palabra = contiene(texto, REGLAS.notificacionAsunto))) {\n    categoria = 'notificacion'; motivo = `Contiene \"${palabra}\"`;\n  } else if ((palabra = contiene(texto, REGLAS.tarea))) {\n    categoria = 'tarea'; motivo = `Contiene \"${palabra}\"`;\n  }\n\n  return {\n    message_id: correo.id || '',\n    fecha_procesado: $now.toFormat('yyyy-MM-dd HH:mm'),\n    remitente: direccion,\n    asunto: String(asunto).slice(0, 200),\n    categoria,\n    motivo,\n  };\n}\n\nreturn $input.all()\n  .filter((item) => item.json && (item.json.id || item.json.Subject || item.json.subject))\n  .map((item) => ({ json: clasificar(item.json) }));"
+      },
+      "id": "0b2459fe-d6aa-5930-ab68-362848088059",
+      "name": "Clasificar correo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Configuración').first().json.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "RegistroCorreos",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW",
+          "handlingExtraData": "ignoreIt"
+        }
+      },
+      "id": "6596a7d2-1647-59d8-91c0-9ee75c39fc83",
+      "name": "Registrar en hoja",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        700,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "0f465c56-9fb4-5d8a-a4d3-999ab96aa865",
+                    "leftValue": "={{ $json.categoria }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "importante"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "importante"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "06b9f65a-372f-5ec9-b026-d2a940029647",
+                    "leftValue": "={{ $json.categoria }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "tarea"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "tarea"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "906bbea2-7b2e-598c-b0f0-50678237b4a6",
+                    "leftValue": "={{ $json.categoria }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "notificacion"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "notificacion"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "41cf2546-c888-526a-b2a1-090b91d762ec",
+                    "leftValue": "={{ $json.categoria }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "newsletter"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "newsletter"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "8d9fded0-f9e9-521e-86f1-a54f5f72078f",
+      "name": "Según categoría",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.5,
+      "position": [
+        700,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $json.message_id }}",
+        "labelIds": []
+      },
+      "id": "b24c0b2a-71cf-524f-b9d5-5275838701f7",
+      "name": "Etiquetar Importante",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $json.message_id }}",
+        "labelIds": []
+      },
+      "id": "6381a8a9-cbf4-5992-8e0a-773f62756675",
+      "name": "Etiquetar Tarea",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        30
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $json.message_id }}",
+        "labelIds": []
+      },
+      "id": "f43115f5-b33c-5d37-8fdf-b9c3bcab2f9c",
+      "name": "Etiquetar Notificación",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $json.message_id }}",
+        "labelIds": []
+      },
+      "id": "d3301fa7-c484-5b8c-b12a-2be82f92d7e4",
+      "name": "Etiquetar Newsletter",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        330
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Según categoría": {
+      "main": [
+        [
+          {
+            "node": "Etiquetar Importante",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Etiquetar Tarea",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Etiquetar Notificación",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Etiquetar Newsletter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuración": {
+      "main": [
+        [
+          {
+            "node": "Clasificar correo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificar correo": {
+      "main": [
+        [
+          {
+            "node": "Registrar en hoja",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Según categoría",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

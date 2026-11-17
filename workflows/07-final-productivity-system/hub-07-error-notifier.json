@@ -1,0 +1,129 @@
+{
+  "name": "Hub 7 - Avisos de error",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Avisos de error\nAsígnalo como **Error workflow** en *Settings* del router y del workflow de resúmenes. Cuando fallen, recibirás un mensaje en Telegram.\n\nRellena `chatId` y asigna la credencial Telegram.",
+        "height": 220,
+        "width": 520
+      },
+      "id": "b1fb8112-a91a-5b9c-bccc-96356598569a",
+      "name": "Nota 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -380
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "d88aa505-f0b3-53b2-872a-56f8a4a5c3a4",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "53f714cf-ba32-5b9b-968a-844a112b29ed",
+              "name": "chatId",
+              "value": "REEMPLAZAR_CON_TU_CHAT_ID",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "97fa492d-a36a-5e33-8dbd-d4f38291a774",
+      "name": "Configuración",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construye un aviso breve sin incluir datos personales de la ejecución.\nconst e = $input.first().json;\nconst lineas = [\n  'Error en el Productivity Hub',\n  `Workflow: ${e.workflow?.name || 'desconocido'}`,\n  `Nodo: ${e.execution?.lastNodeExecuted || 'desconocido'}`,\n  `Mensaje: ${String(e.execution?.error?.message || 'sin mensaje').slice(0, 300)}`,\n  `Hora: ${$now.toFormat('yyyy-MM-dd HH:mm')}`,\n];\nif (e.execution?.url) lineas.push(`Detalle: ${e.execution.url}`);\nreturn [{ json: { chatId: e.chatId, respuesta: lineas.join('\\n') } }];"
+      },
+      "id": "397741b2-2a1f-54b6-ac58-1e874124d123",
+      "name": "Formatear aviso",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.respuesta }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "187258a6-22e7-54f0-9d7e-3257e7a1aa04",
+      "name": "Enviar aviso",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        660,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuración": {
+      "main": [
+        [
+          {
+            "node": "Formatear aviso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear aviso": {
+      "main": [
+        [
+          {
+            "node": "Enviar aviso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

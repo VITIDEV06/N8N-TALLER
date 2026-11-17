@@ -1,0 +1,77 @@
+# =================================================================
+# n8n Productivity Workshop - Docker Compose para ENTORNO LOCAL
+# -----------------------------------------------------------------
+# Servicios:
+#   - postgres : base de datos de n8n (workflows, credenciales, ejecuciones)
+#   - n8n      : editor y motor de automatizacion
+#
+# Uso:
+#   cp .env.example .env      # y edita los valores marcados con CAMBIAR
+#   docker compose up -d
+#   abre http://localhost:5678
+#
+# IMPORTANTE: esta configuracion esta pensada para aprender en tu
+# propio equipo. El puerto solo escucha en 127.0.0.1 y no hay HTTPS.
+# Para exponer n8n a Internet lee docs/security.md antes de hacerlo.
+# =================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-n8n}
+      POSTGRES_USER: ${POSTGRES_USER:-n8n}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # PostgreSQL no publica puertos: solo n8n puede alcanzarlo por la red interna.
+
+  n8n:
+    image: n8nio/n8n:${N8N_VERSION:-2.48.4}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      # Solo accesible desde tu propio equipo.
+      - "127.0.0.1:5678:5678"
+    environment:
+      # Base de datos
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB:-n8n}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER:-n8n}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+      # Red y URL
+      N8N_HOST: ${N8N_HOST:-localhost}
+      N8N_PORT: ${N8N_PORT:-5678}
+      N8N_PROTOCOL: ${N8N_PROTOCOL:-http}
+      WEBHOOK_URL: ${WEBHOOK_URL:-http://localhost:5678/}
+      N8N_PROXY_HOPS: ${N8N_PROXY_HOPS:-0}
+      # Zona horaria
+      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:-UTC}
+      TZ: ${TZ:-UTC}
+      # Seguridad
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Define N8N_ENCRYPTION_KEY en el archivo .env}
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      # Privacidad y mantenimiento
+      N8N_DIAGNOSTICS_ENABLED: ${N8N_DIAGNOSTICS_ENABLED:-false}
+      EXECUTIONS_DATA_PRUNE: ${EXECUTIONS_DATA_PRUNE:-true}
+      EXECUTIONS_DATA_MAX_AGE: ${EXECUTIONS_DATA_MAX_AGE:-336}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    extra_hosts:
+      # Permite llegar a servicios del equipo anfitrion (por ejemplo Ollama)
+      # mediante http://host.docker.internal desde n8n.
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  postgres_data:
+  n8n_data:

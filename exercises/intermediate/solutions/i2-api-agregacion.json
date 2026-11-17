@@ -1,0 +1,81 @@
+{
+  "name": "Solución I2 - API pública con agregación",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "25a7b52b-8039-53c0-b276-1aa2c029a933",
+      "name": "Ejecutar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://jsonplaceholder.typicode.com/posts",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "d812e91d-003b-5b48-94bb-0b859e0e801d",
+      "name": "Obtener publicaciones",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        220,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Agrupa las publicaciones por userId y calcula estadísticas.\nconst conteo = {};\nfor (const { json } of $input.all()) {\n  conteo[json.userId] = (conteo[json.userId] || 0) + 1;\n}\nconst ranking = Object.entries(conteo)\n  .map(([usuario, total]) => ({ usuario: Number(usuario), total }))\n  .sort((a, b) => b.total - a.total || a.usuario - b.usuario);\nreturn [{ json: { totalPublicaciones: $input.all().length, usuarios: ranking.length, ranking } }];"
+      },
+      "id": "aaf5569d-c29a-5654-ae5d-71f09eac7d63",
+      "name": "Contar por usuario",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Ejecutar manualmente": {
+      "main": [
+        [
+          {
+            "node": "Obtener publicaciones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener publicaciones": {
+      "main": [
+        [
+          {
+            "node": "Contar por usuario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

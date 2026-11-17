@@ -1,0 +1,59 @@
+name: Reporte de error
+description: Algo del taller no funciona como indica la documentación.
+title: "[Error]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por reportar el problema. **No incluyas tokens, API keys, correos ni datos personales.**
+  - type: input
+    id: n8n-version
+    attributes:
+      label: Versión de n8n
+      placeholder: "2.48.4"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Método de instalación
+      options:
+        - Docker Compose del taller
+        - Docker (otra configuración)
+        - npm
+        - n8n Cloud
+        - Otro
+    validations:
+      required: true
+  - type: input
+    id: affected
+    attributes:
+      label: Archivo o workflow afectado
+      placeholder: "workflows/02-task-manager/task-manager.json"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Pasos para reproducir
+      placeholder: |
+        1. Importo el workflow...
+        2. Configuro...
+        3. Envío el mensaje...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Resultado esperado
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Resultado obtenido y mensaje de error
+      description: Copia el error del panel de ejecución, sin datos sensibles.
+      render: text
+    validations:
+      required: true

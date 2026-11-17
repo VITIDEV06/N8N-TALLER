@@ -1,0 +1,79 @@
+{
+  "_descripcion": "Correos ficticios con el formato de la salida simplificada (Simplify = true) del Gmail Trigger de n8n. Todas las direcciones usan dominios ficticios o reservados (example.com). Se usan en workflows/04-email-organizer/email-classifier-test.json.",
+  "emails": [
+    {
+      "id": "demo-0001",
+      "threadId": "demo-0001",
+      "From": "Marta Directora <jefa@empresa-ficticia.com>",
+      "To": "estudiante@example.com",
+      "Subject": "Revisión del presupuesto",
+      "snippet": "Hola, cuando puedas échale un vistazo al documento adjunto."
+    },
+    {
+      "id": "demo-0002",
+      "threadId": "demo-0002",
+      "From": "Soporte Proveedor <soporte@proveedor.example.com>",
+      "To": "estudiante@example.com",
+      "Subject": "URGENTE: renovación del contrato vence hoy",
+      "snippet": "Tu contrato ficticio vence hoy. Acción requerida para evitar la suspensión del servicio."
+    },
+    {
+      "id": "demo-0003",
+      "threadId": "demo-0003",
+      "From": "Boletín Tech <newsletter@noticias.example.com>",
+      "To": "estudiante@example.com",
+      "Subject": "Las 10 herramientas de automatización de la semana",
+      "snippet": "Esta semana repasamos novedades. Si no quieres recibir más correos, puedes darte de baja aquí."
+    },
+    {
+      "id": "demo-0004",
+      "threadId": "demo-0004",
+      "From": "Tienda Online <no-reply@tienda.example.com>",
+      "To": "estudiante@example.com",
+      "Subject": "Tu pedido #48213 ha sido enviado",
+      "snippet": "Tu pedido está en camino y llegará en 2 o 3 días laborables."
+    },
+    {
+      "id": "demo-0005",
+      "threadId": "demo-0005",
+      "From": "Carlos Compañero <carlos@empresa-ficticia.com>",
+      "To": "estudiante@example.com",
+      "Subject": "¿Podrías revisar el informe antes del viernes?",
+      "snippet": "Por favor, revisa la sección 3 y envíame tus comentarios antes del viernes."
+    },
+    {
+      "id": "demo-0006",
+      "threadId": "demo-0006",
+      "From": "Seguridad Cuenta <security-alerts@servicio.example.com>",
+      "To": "estudiante@example.com",
+      "Subject": "Nuevo inicio de sesión detectado",
+      "snippet": "Detectamos un inicio de sesión desde un dispositivo nuevo."
+    },
+    {
+      "id": "demo-0007",
+      "threadId": "demo-0007",
+      "From": "Ana Amiga <ana@example.com>",
+      "To": "estudiante@example.com",
+      "Subject": "Fotos del fin de semana",
+      "snippet": "Te paso las fotos de la excursión, salieron muy bien."
+    },
+    {
+      "id": "demo-0008",
+      "threadId": "demo-0008",
+      "From": "Banco Ficticio <avisos@banco-ficticio.com>",
+      "To": "estudiante@example.com",
+      "Subject": "Extracto mensual disponible",
+      "snippet": "Ya puedes consultar tu extracto mensual en la banca en línea."
+    }
+  ],
+  "_resultadoEsperado": {
+    "demo-0001": "importante (remitente marcado como importante)",
+    "demo-0002": "importante (contiene \"urgente\")",
+    "demo-0003": "newsletter (contiene \"darte de baja\")",
+    "demo-0004": "notificacion (remitente automático no-reply)",
+    "demo-0005": "tarea (contiene \"por favor\")",
+    "demo-0006": "notificacion (remitente automático alerts)",
+    "demo-0007": "otros",
+    "demo-0008": "importante (remitente marcado como importante: banco-ficticio.com)"
+  }
+}

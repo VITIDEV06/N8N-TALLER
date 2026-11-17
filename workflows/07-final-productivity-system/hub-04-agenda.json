@@ -1,0 +1,142 @@
+{
+  "name": "Hub 4 - Módulo de agenda",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Sub-workflow: agenda\nConsulta los eventos de hoy y las tareas pendientes y devuelve el resumen.\nLo usan el comando `/agenda` y el resumen diario programado.",
+        "height": 200,
+        "width": 520
+      },
+      "id": "3c8c366b-65a0-5f41-b987-57d9e526c143",
+      "name": "Nota 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -380
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "3806df30-5017-5c3c-be5b-a133e4f5e3ba",
+      "name": "Entrada del router",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "={{ $('Entrada del router').first().json.config.calendarId }}",
+          "mode": "id"
+        },
+        "returnAll": true,
+        "timeMin": "={{ $now.startOf('day').toISO() }}",
+        "timeMax": "={{ $now.endOf('day').toISO() }}",
+        "options": {
+          "orderBy": "startTime",
+          "recurringEventHandling": "expand"
+        }
+      },
+      "id": "81a0d199-a295-5f51-b524-e9496c8ad4f9",
+      "name": "Eventos de hoy",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.4,
+      "position": [
+        220,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Entrada del router').first().json.config.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Tareas",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "919240c2-e5d9-5cf6-8c60-4bb925e97aa9",
+      "name": "Tareas pendientes",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        440,
+        0
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---------------------------------------------------------------\n// Construye el resumen diario a partir de los eventos del calendario\n// y, opcionalmente, de las tareas pendientes de Google Sheets.\n// ---------------------------------------------------------------\nconst zona = $now.zoneName;\nconst hoy = $now.startOf('day');\nconst hoyTexto = hoy.toFormat('yyyy-MM-dd');\n\nfunction leerNodo(nombre) {\n  try {\n    return $(nombre).all().map((i) => i.json);\n  } catch (error) {\n    return []; // el nodo no se ejecutó o está desactivado\n  }\n}\n\nfunction hora(dt) {\n  return dt.toFormat('HH:mm');\n}\n\nfunction construirResumen(config, eventosRaw, tareasRaw) {\n  // 1. Normalizar eventos (los de día completo usan start.date)\n  const eventos = eventosRaw\n    .filter((e) => e && e.start && e.status !== 'cancelled')\n    .map((e) => {\n      const todoElDia = !e.start.dateTime;\n      const inicio = todoElDia ? DateTime.fromISO(e.start.date, { zone: zona }) : DateTime.fromISO(e.start.dateTime).setZone(zona);\n      const fin = todoElDia ? DateTime.fromISO(e.end?.date || e.start.date, { zone: zona }) : DateTime.fromISO(e.end?.dateTime || e.start.dateTime).setZone(zona);\n      return { titulo: e.summary || '(sin título)', lugar: e.location || '', todoElDia, inicio, fin };\n    })\n    .sort((a, b) => (a.todoElDia === b.todoElDia ? a.inicio - b.inicio : a.todoElDia ? -1 : 1));\n\n  // 2. Huecos libres dentro de la jornada\n  const [hIni, mIni] = String(config.inicioJornada || '08:00').split(':').map(Number);\n  const [hFin, mFin] = String(config.finJornada || '20:00').split(':').map(Number);\n  const inicioJornada = hoy.set({ hour: hIni, minute: mIni || 0 });\n  const finJornada = hoy.set({ hour: hFin, minute: mFin || 0 });\n  const huecos = [];\n  let cursor = inicioJornada;\n  for (const ev of eventos.filter((e) => !e.todoElDia)) {\n    if (ev.inicio > cursor) huecos.push({ desde: cursor, hasta: ev.inicio < finJornada ? ev.inicio : finJornada });\n    if (ev.fin > cursor) cursor = ev.fin;\n  }\n  if (cursor < finJornada) huecos.push({ desde: cursor, hasta: finJornada });\n  const huecosUtiles = huecos.filter((h) => h.hasta.diff(h.desde, 'minutes').minutes >= 30);\n\n  // 3. Tareas pendientes del chat configurado\n  const tareas = tareasRaw\n    .filter((t) => t && t.id && t.estado !== 'completada')\n    .filter((t) => !config.chatId || String(t.chat_id) === String(config.chatId));\n  const vencidas = tareas.filter((t) => t.fecha_limite && t.fecha_limite < hoyTexto);\n  const paraHoy = tareas.filter((t) => t.fecha_limite === hoyTexto);\n  const altas = tareas.filter((t) => t.prioridad === 'alta' && !vencidas.includes(t) && !paraHoy.includes(t));\n\n  // 4. Mensaje\n  const fechaLarga = $now.setLocale('es').toFormat(\"cccc d 'de' LLLL\");\n  const lineas = [`Resumen del ${fechaLarga}`, ''];\n\n  lineas.push(`AGENDA (${eventos.length} ${eventos.length === 1 ? 'evento' : 'eventos'})`);\n  if (eventos.length === 0) lineas.push('- Sin eventos en el calendario.');\n  for (const ev of eventos) {\n    const franja = ev.todoElDia ? 'Todo el día' : `${hora(ev.inicio)}-${hora(ev.fin)}`;\n    lineas.push(`- ${franja}  ${ev.titulo}${ev.lugar ? ` (${ev.lugar})` : ''}`);\n  }\n\n  lineas.push('', 'TIEMPO LIBRE EN TU JORNADA');\n  if (huecosUtiles.length === 0) lineas.push('- Sin huecos de 30 minutos o más.');\n  for (const h of huecosUtiles) {\n    const minutos = Math.round(h.hasta.diff(h.desde, 'minutes').minutes);\n    const duracion = minutos >= 60 ? `${Math.floor(minutos / 60)} h ${minutos % 60 ? (minutos % 60) + ' min' : ''}`.trim() : `${minutos} min`;\n    lineas.push(`- ${hora(h.desde)}-${hora(h.hasta)} (${duracion})`);\n  }\n\n  if (config.incluirTareas) {\n    lineas.push('', 'TAREAS');\n    lineas.push(`Vencidas: ${vencidas.length} | Para hoy: ${paraHoy.length} | Pendientes: ${tareas.length}`);\n    const destacadas = [...vencidas, ...paraHoy, ...altas].slice(0, 8);\n    for (const t of destacadas) {\n      const marca = vencidas.includes(t) ? 'VENCIDA' : paraHoy.includes(t) ? 'hoy' : t.prioridad;\n      lineas.push(`- [${marca}] ${t.titulo} (${t.id})`);\n    }\n  }\n\n  return {\n    chatId: String(config.chatId || ''),\n    fecha: hoyTexto,\n    totalEventos: eventos.length,\n    totalTareasPendientes: tareas.length,\n    tareasVencidas: vencidas.length,\n    respuesta: lineas.join('\\n'),\n  };\n}\n\nconst entrada = $('Entrada del router').first().json;\nconst config = { ...entrada.config, chatId: entrada.chatId };\nconst eventos = leerNodo('Eventos de hoy');\nconst tareas = config.incluirTareas ? leerNodo('Tareas pendientes') : [];\nreturn [{ json: construirResumen(config, eventos, tareas) }];"
+      },
+      "id": "2dfcb65a-1fd2-5943-a9a2-a368d89fb0af",
+      "name": "Construir resumen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Entrada del router": {
+      "main": [
+        [
+          {
+            "node": "Eventos de hoy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eventos de hoy": {
+      "main": [
+        [
+          {
+            "node": "Tareas pendientes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tareas pendientes": {
+      "main": [
+        [
+          {
+            "node": "Construir resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

@@ -1,0 +1,58 @@
+# ---------------------------------------------------------------
+# n8n Productivity Workshop - .gitignore
+# ---------------------------------------------------------------
+
+# Secretos y configuracion local
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.crt
+credentials*.json
+!templates/**/credentials*.example.json
+service-account*.json
+client_secret*.json
+token*.json
+
+# Datos de n8n (base de datos, clave de cifrado, logs)
+.n8n/
+n8n_data/
+local-files/
+*.sqlite
+*.sqlite-journal
+database.sqlite*
+
+# Datos de PostgreSQL si se montan como carpeta local
+postgres_data/
+pgdata/
+
+# Copias de seguridad y exportaciones personales
+backups/
+exports/
+*.backup
+*.dump
+
+# Exportaciones de credenciales (nunca deben subirse)
+*credentials-export*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Node
+node_modules/
+
+# Sistema operativo y editores
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.log

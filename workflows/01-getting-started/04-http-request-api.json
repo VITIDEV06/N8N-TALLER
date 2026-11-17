@@ -1,0 +1,272 @@
+{
+  "name": "04 - HTTP Request a una API REST",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 04 - HTTP Request a una API REST\nConsulta la API pública de pruebas **JSONPlaceholder** (datos ficticios, sin registro).\n\n- La respuesta es un array: n8n crea un item por cada elemento.\n- **IF** separa tareas completadas y pendientes.\n- **Merge** vuelve a unir ambas ramas.\n- **Code** calcula un resumen.",
+        "height": 260,
+        "width": 520
+      },
+      "id": "4d1664da-883a-5f92-8588-4f3b261e5c82",
+      "name": "Nota 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -320
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "95518ad0-4610-51da-9822-11c92abde63b",
+      "name": "Ejecutar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://jsonplaceholder.typicode.com/todos",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "userId",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "09cfe540-2306-5ff1-b731-8c1c899e7f8d",
+      "name": "Obtener tareas de la API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        220,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "05315e90-dafc-5cfc-89a4-16a14aa158c8",
+              "leftValue": "={{ $json.completed }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "c9df5bff-2e3b-5211-bb7d-866ad4975779",
+      "name": "¿Completada?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "346d2151-4d97-5308-b253-2a1cacbe08d8",
+              "name": "id",
+              "value": "={{ $json.id }}",
+              "type": "number"
+            },
+            {
+              "id": "542906b1-b9e4-54d0-80cf-25ba572a4a5a",
+              "name": "titulo",
+              "value": "={{ $json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "af0be343-51cf-54f2-a642-f3cda663fbc3",
+              "name": "estado",
+              "value": "completada",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2cb3c422-3c66-5b68-97d5-dae65fab90d4",
+      "name": "Marcar como hecha",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        680,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "346d2151-4d97-5308-b253-2a1cacbe08d8",
+              "name": "id",
+              "value": "={{ $json.id }}",
+              "type": "number"
+            },
+            {
+              "id": "542906b1-b9e4-54d0-80cf-25ba572a4a5a",
+              "name": "titulo",
+              "value": "={{ $json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "b1d037c6-40a9-56db-a500-79992743f460",
+              "name": "estado",
+              "value": "pendiente",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "73874087-331d-561e-ad4c-52a9d7967e10",
+      "name": "Marcar como pendiente",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        680,
+        100
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "70b41c3f-c171-5a7e-a064-bb5ec4adceed",
+      "name": "Unir resultados",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        900,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Recibe todas las tareas unidas y calcula un resumen.\nconst tareas = $input.all().map((item) => item.json);\nconst completadas = tareas.filter((t) => t.estado === 'completada').length;\nconst total = tareas.length;\n\nreturn [{ json: {\n  total,\n  completadas,\n  pendientes: total - completadas,\n  porcentajeCompletado: total ? Math.round((completadas / total) * 100) : 0,\n  primerasPendientes: tareas.filter((t) => t.estado === 'pendiente').slice(0, 3).map((t) => t.titulo),\n} }];"
+      },
+      "id": "46fcead9-929c-5feb-bc2e-0b9cea6a9949",
+      "name": "Calcular resumen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Ejecutar manualmente": {
+      "main": [
+        [
+          {
+            "node": "Obtener tareas de la API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener tareas de la API": {
+      "main": [
+        [
+          {
+            "node": "¿Completada?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Completada?": {
+      "main": [
+        [
+          {
+            "node": "Marcar como hecha",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar como pendiente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar como hecha": {
+      "main": [
+        [
+          {
+            "node": "Unir resultados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar como pendiente": {
+      "main": [
+        [
+          {
+            "node": "Unir resultados",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Unir resultados": {
+      "main": [
+        [
+          {
+            "node": "Calcular resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

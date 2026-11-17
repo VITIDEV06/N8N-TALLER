@@ -1,0 +1,185 @@
+{
+  "name": "09 - Datos y expresiones",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 09 - Datos y expresiones (Módulo 04)\n- **Datos de entrada**: JSON con objetos y arrays.\n- **Expresiones**: lectura de campos, arrays, fechas con Luxon y condiciones.\n- **Validar y transformar**: validación de datos con un nodo Code.\n\nAbre cada nodo y revisa las expresiones `{{ }}`.",
+        "height": 260,
+        "width": 560
+      },
+      "id": "367c7ebd-ace1-5712-9dc6-97909c4db264",
+      "name": "Nota 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -320
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "05919cf2-1cf5-52ea-8959-bbca01f19b0e",
+      "name": "Ejecutar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Un objeto con objetos anidados y arrays, como el que devuelve una API.\nreturn [{ json: {\n  usuario: { nombre: 'Laura Gómez', email: 'laura@example.com', zona: 'America/Bogota' },\n  tareas: [\n    { titulo: 'Enviar informe', prioridad: 'alta', fecha_limite: '2026-11-18', hecha: false },\n    { titulo: 'Reservar vuelo', prioridad: 'media', fecha_limite: '2026-11-25', hecha: true },\n    { titulo: 'Comprar regalo', prioridad: 'baja', fecha_limite: '', hecha: false },\n  ],\n  etiquetas: ['personal', 'trabajo'],\n} }];"
+      },
+      "id": "2f4ecf43-4c51-5c2e-97ad-87516ebef4e1",
+      "name": "Datos de entrada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d7889544-87f4-51ab-b430-c3b050bde57f",
+              "name": "nombre",
+              "value": "={{ $json.usuario.nombre }}",
+              "type": "string"
+            },
+            {
+              "id": "883452ad-8858-58b3-9efe-02f1fd8e4760",
+              "name": "iniciales",
+              "value": "={{ $json.usuario.nombre.split(' ').map(p => p[0]).join('') }}",
+              "type": "string"
+            },
+            {
+              "id": "1a1ff7ae-eb8a-532f-b17e-5f0a5b9bd53d",
+              "name": "totalTareas",
+              "value": "={{ $json.tareas.length }}",
+              "type": "number"
+            },
+            {
+              "id": "9b8eb710-65f9-5b61-882b-e0b20135140d",
+              "name": "pendientes",
+              "value": "={{ $json.tareas.filter(t => !t.hecha).length }}",
+              "type": "number"
+            },
+            {
+              "id": "427188d5-a6be-5978-a6ff-a3f88dced26d",
+              "name": "titulosPendientes",
+              "value": "={{ $json.tareas.filter(t => !t.hecha).map(t => t.titulo) }}",
+              "type": "array"
+            },
+            {
+              "id": "ca8d896f-0910-5024-9a35-df0e936e630c",
+              "name": "etiquetasTexto",
+              "value": "={{ $json.etiquetas.join(', ') }}",
+              "type": "string"
+            },
+            {
+              "id": "40665401-0d1c-537a-aaa3-c2ec92ac68bf",
+              "name": "hoy",
+              "value": "={{ $now.toFormat('yyyy-MM-dd') }}",
+              "type": "string"
+            },
+            {
+              "id": "95740bce-d5ad-5755-aecb-31e1516b3b7c",
+              "name": "dentroDeUnaSemana",
+              "value": "={{ $now.plus({ days: 7 }).toFormat('yyyy-MM-dd') }}",
+              "type": "string"
+            },
+            {
+              "id": "a02a06eb-a3b7-535a-b6ae-d3bc8ac39451",
+              "name": "diaEnEspanol",
+              "value": "={{ $now.setLocale('es').toFormat(\"cccc d 'de' LLLL\") }}",
+              "type": "string"
+            },
+            {
+              "id": "4d43cb72-4ef7-5034-ab39-d28f369a3308",
+              "name": "hayAlta",
+              "value": "={{ $json.tareas.some(t => t.prioridad === 'alta' && !t.hecha) }}",
+              "type": "boolean"
+            },
+            {
+              "id": "5f9cc4bf-99ef-5297-b362-8412e5461774",
+              "name": "estadoGeneral",
+              "value": "={{ $json.tareas.every(t => t.hecha) ? 'todo hecho' : 'hay pendientes' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "d0507d9c-e994-5cbb-8375-1c9104f1e937",
+      "name": "Expresiones",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Valida cada tarea y la transforma en un item independiente.\nconst datos = $input.first().json;\nconst hoy = DateTime.fromISO(datos.hoy);\nconst resultado = [];\n\nfor (const tarea of datos.tareas) {\n  const errores = [];\n  if (!tarea.titulo || tarea.titulo.length < 3) errores.push('título demasiado corto');\n  if (!['alta', 'media', 'baja'].includes(tarea.prioridad)) errores.push('prioridad no válida');\n\n  let diasRestantes = null;\n  if (tarea.fecha_limite) {\n    const fecha = DateTime.fromISO(tarea.fecha_limite);\n    if (!fecha.isValid) errores.push('fecha no válida');\n    else diasRestantes = Math.round(fecha.diff(hoy, 'days').days);\n  }\n\n  resultado.push({ json: {\n    titulo: tarea.titulo,\n    prioridad: tarea.prioridad,\n    hecha: tarea.hecha,\n    diasRestantes,\n    vencida: diasRestantes !== null && diasRestantes < 0 && !tarea.hecha,\n    valida: errores.length === 0,\n    errores,\n    responsable: datos.nombre,\n  } });\n}\nreturn resultado;"
+      },
+      "id": "2856bf35-606f-56f1-aae3-130ffaa01ce3",
+      "name": "Validar y transformar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Ejecutar manualmente": {
+      "main": [
+        [
+          {
+            "node": "Datos de entrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos de entrada": {
+      "main": [
+        [
+          {
+            "node": "Expresiones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expresiones": {
+      "main": [
+        [
+          {
+            "node": "Validar y transformar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

@@ -1,0 +1,312 @@
+{
+  "name": "Hub 3 - Módulo de hábitos",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Sub-workflow: hábitos\nRecibe `{ texto, chatId, config }` y devuelve `{ chatId, respuesta }`.\nMisma lógica que el Proyecto D. También lo usa el resumen semanal (`/stats 7`).",
+        "height": 200,
+        "width": 520
+      },
+      "id": "e7043f00-13ae-5f2a-9a53-008962863244",
+      "name": "Nota 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -420
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "b04a793c-1a02-5a9e-be9c-9ae02a73dac6",
+      "name": "Entrada del router",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---------------------------------------------------------------\n// Interpreta los comandos del registro de hábitos.\n// accion: registrar | listar | hoy | stats | ayuda | error\n// ---------------------------------------------------------------\nconst AYUDA = [\n  'Registro de hábitos - comandos:',\n  '/habito nombre [nota] - registra el hábito de hoy',\n  '   ejemplo: /habito leer 20 páginas de un libro',\n  '/habitos - lista los hábitos disponibles',\n  '/hoy - hábitos cumplidos y pendientes de hoy',\n  '/stats [días] - porcentaje de cumplimiento (7 por defecto, máximo 90)',\n].join('\\n');\n\nfunction interpretarHabito(textoOriginal, chatId) {\n  const base = { chatId: String(chatId || '') };\n  const texto = String(textoOriginal || '').trim();\n  if (!texto.startsWith('/')) {\n    return { ...base, accion: 'error', respuesta: 'Usa un comando, por ejemplo /habito leer\\n\\n' + AYUDA };\n  }\n  const [primera, ...resto] = texto.split(/\\s+/);\n  const comando = primera.toLowerCase().split('@')[0];\n\n  if (['/start', '/ayuda', '/help'].includes(comando)) return { ...base, accion: 'ayuda', respuesta: AYUDA };\n  if (comando === '/habitos') return { ...base, accion: 'listar' };\n  if (comando === '/hoy') return { ...base, accion: 'hoy' };\n  if (comando === '/stats') {\n    const dias = resto[0] ? Number(resto[0]) : 7;\n    if (!Number.isInteger(dias) || dias < 1 || dias > 90) {\n      return { ...base, accion: 'error', respuesta: 'El número de días debe ser un entero entre 1 y 90. Ejemplo: /stats 30' };\n    }\n    return { ...base, accion: 'stats', dias };\n  }\n  if (comando === '/habito') {\n    if (resto.length === 0) {\n      return { ...base, accion: 'error', respuesta: 'Indica el hábito. Ejemplo: /habito leer\\nConsulta la lista con /habitos' };\n    }\n    const nota = resto.slice(1).join(' ').slice(0, 300);\n    return { ...base, accion: 'registrar', habito: resto[0], nota };\n  }\n  return { ...base, accion: 'error', respuesta: `Comando no reconocido: ${comando}\\n\\n${AYUDA}` };\n}\n\nconst entrada = $('Entrada del router').first().json;\nreturn [{ json: interpretarHabito(entrada.texto, entrada.chatId) }];"
+      },
+      "id": "ceca95c4-9f7d-5d01-b156-c18a99202d94",
+      "name": "Interpretar hábito",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Entrada del router').first().json.config.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Habitos",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "dc480df5-6619-5d58-9c19-f801c08f5be4",
+      "name": "Leer hábitos",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        440,
+        0
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Entrada del router').first().json.config.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "RegistroHabitos",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "45b67ed1-acc9-5b75-9e13-97fd38a7f81f",
+      "name": "Leer registro",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        660,
+        0
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---------------------------------------------------------------\n// Utilidades de hábitos: normalización y estadísticas.\n// ---------------------------------------------------------------\nconst normalizar = (t) => String(t || '')\n  .normalize('NFD').replace(/[̀-ͯ]/g, '')\n  .trim().toLowerCase();\n\nconst esActivo = (v) => v === true || ['si', 'true', '1', 'yes', 'activo'].includes(normalizar(v));\n\nfunction leerNodo(nombre) {\n  try {\n    return $(nombre).all().map((i) => i.json);\n  } catch (error) {\n    return [];\n  }\n}\n\nfunction habitosActivos(filas) {\n  return filas\n    .filter((h) => h && h.habito && esActivo(h.activo))\n    .map((h) => ({\n      habito: normalizar(h.habito),\n      descripcion: h.descripcion || '',\n      metaSemanal: Math.min(7, Math.max(1, Number(h.meta_semanal) || 7)),\n    }));\n}\n\nfunction registrosDelChat(filas, chatId) {\n  return filas\n    .filter((r) => r && r.habito && r.fecha)\n    .filter((r) => !chatId || String(r.chat_id) === String(chatId))\n    .map((r) => ({ ...r, habito: normalizar(r.habito), fecha: String(r.fecha).slice(0, 10) }));\n}\n\n// Porcentaje de cumplimiento en los últimos \"dias\" días (incluido hoy).\nfunction calcularEstadisticas(habitos, registros, dias) {\n  const desde = $now.minus({ days: dias - 1 }).toFormat('yyyy-MM-dd');\n  const hasta = $now.toFormat('yyyy-MM-dd');\n  return habitos.map((h) => {\n    const fechas = new Set(registros\n      .filter((r) => r.habito === h.habito && r.fecha >= desde && r.fecha <= hasta)\n      .map((r) => r.fecha));\n    const objetivo = Math.max(1, Math.round((h.metaSemanal * dias) / 7));\n    const porcentaje = Math.min(100, Math.round((fechas.size / objetivo) * 100));\n    return { habito: h.habito, diasCumplidos: fechas.size, objetivo, porcentaje };\n  });\n}\n\nfunction barra(porcentaje) {\n  const llenos = Math.round(porcentaje / 10);\n  return '#'.repeat(llenos) + '-'.repeat(10 - llenos);\n}\n\nfunction textoEstadisticas(estadisticas, dias) {\n  if (estadisticas.length === 0) return 'No hay hábitos activos en la hoja Habitos.';\n  const media = Math.round(estadisticas.reduce((s, e) => s + e.porcentaje, 0) / estadisticas.length);\n  const lineas = estadisticas\n    .sort((a, b) => b.porcentaje - a.porcentaje)\n    .map((e) => `${barra(e.porcentaje)} ${String(e.porcentaje).padStart(3)}%  ${e.habito} (${e.diasCumplidos}/${e.objetivo} días)`);\n  return [`Cumplimiento de los últimos ${dias} días`, '', ...lineas, '', `Media global: ${media}%`].join('\\n');\n}\n\n// ---------------------------------------------------------------\n// Ejecuta la acción solicitada con los datos leídos de Google Sheets.\n// Si hay que guardar un registro, devuelve guardar = true y la fila.\n// ---------------------------------------------------------------\nconst peticion = $('Interpretar hábito').first().json;\nconst habitos = habitosActivos(leerNodo('Leer hábitos'));\nconst registros = registrosDelChat(leerNodo('Leer registro'), peticion.chatId);\nconst hoy = $now.toFormat('yyyy-MM-dd');\nconst salida = { chatId: peticion.chatId, guardar: false };\n\nswitch (peticion.accion) {\n  case 'ayuda':\n  case 'error':\n    salida.respuesta = peticion.respuesta;\n    break;\n\n  case 'listar':\n    salida.respuesta = habitos.length === 0\n      ? 'No hay hábitos activos. Añádelos en la pestaña Habitos de tu hoja.'\n      : 'Hábitos disponibles:\\n\\n' + habitos.map((h) => `- ${h.habito}: ${h.descripcion} (meta ${h.metaSemanal} días/semana)`).join('\\n');\n    break;\n\n  case 'hoy': {\n    const hechos = new Set(registros.filter((r) => r.fecha === hoy).map((r) => r.habito));\n    const cumplidos = habitos.filter((h) => hechos.has(h.habito)).map((h) => `- ${h.habito}`);\n    const pendientes = habitos.filter((h) => !hechos.has(h.habito)).map((h) => `- ${h.habito}`);\n    salida.respuesta = [\n      `Hábitos de hoy (${hoy}): ${cumplidos.length}/${habitos.length}`,\n      '', 'Cumplidos:', ...(cumplidos.length ? cumplidos : ['- ninguno todavía']),\n      '', 'Pendientes:', ...(pendientes.length ? pendientes : ['- ninguno, buen trabajo']),\n    ].join('\\n');\n    break;\n  }\n\n  case 'stats':\n    salida.respuesta = textoEstadisticas(calcularEstadisticas(habitos, registros, peticion.dias), peticion.dias);\n    break;\n\n  case 'registrar': {\n    const buscado = normalizar(peticion.habito);\n    const exactos = habitos.filter((h) => h.habito === buscado);\n    const candidatos = exactos.length ? exactos : habitos.filter((h) => h.habito.startsWith(buscado));\n    if (candidatos.length !== 1) {\n      salida.respuesta = candidatos.length === 0\n        ? `No existe el hábito \"${peticion.habito}\". Consulta la lista con /habitos`\n        : `\"${peticion.habito}\" coincide con varios hábitos: ${candidatos.map((c) => c.habito).join(', ')}. Escribe el nombre completo.`;\n      break;\n    }\n    const habito = candidatos[0].habito;\n    if (registros.some((r) => r.habito === habito && r.fecha === hoy)) {\n      salida.respuesta = `Ya registraste \"${habito}\" hoy. Solo se cuenta una vez por día.`;\n      break;\n    }\n    salida.guardar = true;\n    salida.fecha = hoy;\n    salida.habito = habito;\n    salida.chat_id = peticion.chatId;\n    salida.nota = peticion.nota || '';\n    salida.registrado_en = $now.toFormat('yyyy-MM-dd HH:mm');\n    const semana = calcularEstadisticas(candidatos, [...registros, { habito, fecha: hoy }], 7)[0];\n    salida.respuesta = `Registrado: ${habito} (${hoy})\\nÚltimos 7 días: ${semana.diasCumplidos}/${semana.objetivo} días, ${semana.porcentaje}% de tu meta.`;\n    break;\n  }\n\n  default:\n    salida.respuesta = 'Acción no soportada.';\n}\n\nreturn [{ json: salida }];"
+      },
+      "id": "8be92a37-146f-5a72-a0ab-222fdd4d2fc6",
+      "name": "Procesar hábito",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "891c4ea5-2669-559f-8809-91b5719e015f",
+              "leftValue": "={{ $json.guardar }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "9b164f71-4e34-530f-acdd-67e718cad86c",
+      "name": "¿Hay que guardar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1100,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Entrada del router').first().json.config.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "RegistroHabitos",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW",
+          "handlingExtraData": "ignoreIt"
+        }
+      },
+      "id": "226a8483-d81f-5ea7-b935-d2e9ff6257a5",
+      "name": "Guardar registro",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1320,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// La respuesta se calculó antes de guardar; se recupera del nodo anterior.\nconst resultado = $('Procesar hábito').first().json;\nreturn [{ json: { chatId: resultado.chatId, respuesta: resultado.respuesta } }];"
+      },
+      "id": "cb1fd828-f929-594a-9143-f954f80857a4",
+      "name": "Recuperar respuesta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        -100
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "c1412639-e3ce-5fa1-b975-a113accaac82",
+      "name": "Salida",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Leer hábitos": {
+      "main": [
+        [
+          {
+            "node": "Leer registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer registro": {
+      "main": [
+        [
+          {
+            "node": "Procesar hábito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Procesar hábito": {
+      "main": [
+        [
+          {
+            "node": "¿Hay que guardar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Hay que guardar?": {
+      "main": [
+        [
+          {
+            "node": "Guardar registro",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar registro": {
+      "main": [
+        [
+          {
+            "node": "Recuperar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entrada del router": {
+      "main": [
+        [
+          {
+            "node": "Interpretar hábito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Interpretar hábito": {
+      "main": [
+        [
+          {
+            "node": "Leer hábitos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recuperar respuesta": {
+      "main": [
+        [
+          {
+            "node": "Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

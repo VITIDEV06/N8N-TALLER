@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Vulnerabilidad de seguridad
+    url: https://github.com/VITIDEV06/n8n-productivity-workshop/security/advisories/new
+    about: Reporta problemas de seguridad de forma privada. No abras un issue público.
+  - name: Comunidad oficial de n8n
+    url: https://community.n8n.io/
+    about: Dudas generales sobre n8n que no están relacionadas con este taller.

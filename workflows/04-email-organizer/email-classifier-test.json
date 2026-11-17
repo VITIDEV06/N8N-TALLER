@@ -1,0 +1,347 @@
+{
+  "name": "Proyecto C - Prueba del clasificador (sin Gmail)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Prueba del clasificador sin Gmail\nUsa 8 correos ficticios (`templates/sample-data/emails.json`) con el mismo formato que el Gmail Trigger simplificado.\n\nPulsa **Execute workflow** y revisa qué salida del Switch recibe cada correo. No necesita credenciales.",
+        "height": 240,
+        "width": 560
+      },
+      "id": "0031ab14-fad4-5135-8623-46a4057d388b",
+      "name": "Nota 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -340
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "42a9b989-c7f8-53cd-8958-a31769edc0c9",
+      "name": "Ejecutar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Correos ficticios con el formato de la salida simplificada del Gmail Trigger.\nconst correos = [\n  {\n    \"id\": \"demo-0001\",\n    \"threadId\": \"demo-0001\",\n    \"From\": \"Marta Directora <jefa@empresa-ficticia.com>\",\n    \"To\": \"estudiante@example.com\",\n    \"Subject\": \"Revisión del presupuesto\",\n    \"snippet\": \"Hola, cuando puedas échale un vistazo al documento adjunto.\"\n  },\n  {\n    \"id\": \"demo-0002\",\n    \"threadId\": \"demo-0002\",\n    \"From\": \"Soporte Proveedor <soporte@proveedor.example.com>\",\n    \"To\": \"estudiante@example.com\",\n    \"Subject\": \"URGENTE: renovación del contrato vence hoy\",\n    \"snippet\": \"Tu contrato ficticio vence hoy. Acción requerida para evitar la suspensión del servicio.\"\n  },\n  {\n    \"id\": \"demo-0003\",\n    \"threadId\": \"demo-0003\",\n    \"From\": \"Boletín Tech <newsletter@noticias.example.com>\",\n    \"To\": \"estudiante@example.com\",\n    \"Subject\": \"Las 10 herramientas de automatización de la semana\",\n    \"snippet\": \"Esta semana repasamos novedades. Si no quieres recibir más correos, puedes darte de baja aquí.\"\n  },\n  {\n    \"id\": \"demo-0004\",\n    \"threadId\": \"demo-0004\",\n    \"From\": \"Tienda Online <no-reply@tienda.example.com>\",\n    \"To\": \"estudiante@example.com\",\n    \"Subject\": \"Tu pedido #48213 ha sido enviado\",\n    \"snippet\": \"Tu pedido está en camino y llegará en 2 o 3 días laborables.\"\n  },\n  {\n    \"id\": \"demo-0005\",\n    \"threadId\": \"demo-0005\",\n    \"From\": \"Carlos Compañero <carlos@empresa-ficticia.com>\",\n    \"To\": \"estudiante@example.com\",\n    \"Subject\": \"¿Podrías revisar el informe antes del viernes?\",\n    \"snippet\": \"Por favor, revisa la sección 3 y envíame tus comentarios antes del viernes.\"\n  },\n  {\n    \"id\": \"demo-0006\",\n    \"threadId\": \"demo-0006\",\n    \"From\": \"Seguridad Cuenta <security-alerts@servicio.example.com>\",\n    \"To\": \"estudiante@example.com\",\n    \"Subject\": \"Nuevo inicio de sesión detectado\",\n    \"snippet\": \"Detectamos un inicio de sesión desde un dispositivo nuevo.\"\n  },\n  {\n    \"id\": \"demo-0007\",\n    \"threadId\": \"demo-0007\",\n    \"From\": \"Ana Amiga <ana@example.com>\",\n    \"To\": \"estudiante@example.com\",\n    \"Subject\": \"Fotos del fin de semana\",\n    \"snippet\": \"Te paso las fotos de la excursión, salieron muy bien.\"\n  },\n  {\n    \"id\": \"demo-0008\",\n    \"threadId\": \"demo-0008\",\n    \"From\": \"Banco Ficticio <avisos@banco-ficticio.com>\",\n    \"To\": \"estudiante@example.com\",\n    \"Subject\": \"Extracto mensual disponible\",\n    \"snippet\": \"Ya puedes consultar tu extracto mensual en la banca en línea.\"\n  }\n];\nreturn correos.map((c) => ({ json: c }));"
+      },
+      "id": "2c4bbe5b-7c2c-5e0d-9e5d-2315491d3c6a",
+      "name": "Correos de ejemplo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4110c953-cc38-527f-a72a-825562740df2",
+              "name": "remitentesImportantes",
+              "value": "jefa@empresa-ficticia.com,banco-ficticio.com",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "29e5b4f9-7920-5ceb-a42a-6d6075c45716",
+      "name": "Configuración",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---------------------------------------------------------------\n// Clasifica cada correo mediante reglas explicables (sin IA).\n// Categorías: importante | tarea | notificacion | newsletter | otros\n// Funciona con la salida simplificada del Gmail Trigger\n// (campos From, Subject, snippet, id).\n// ---------------------------------------------------------------\nconst normalizar = (t) => String(t || '')\n  .normalize('NFD').replace(/[̀-ͯ]/g, '')\n  .toLowerCase();\n\nconst config = $('Configuración').first().json;\nconst remitentesImportantes = String(config.remitentesImportantes || '')\n  .split(',').map((r) => normalizar(r).trim()).filter(Boolean);\n\nconst REGLAS = {\n  newsletter: ['newsletter', 'boletin', 'darte de baja', 'darse de baja', 'unsubscribe', 'cancelar suscripcion', 'resumen semanal', 'digest'],\n  notificacionRemitente: ['no-reply', 'noreply', 'no_reply', 'notifications', 'notificaciones', 'alerts', 'alertas', 'mailer-daemon'],\n  notificacionAsunto: ['notificacion', 'alerta', 'confirmacion', 'tu pedido', 'recibo', 'inicio de sesion', 'codigo de verificacion', 'verification code', 'password reset'],\n  importante: ['urgente', 'importante', 'asap', 'fecha limite', 'vence hoy', 'vencimiento', 'accion requerida', 'action required'],\n  tarea: ['por favor', 'podrias', 'puedes', 'necesito que', 'pendiente', 'revisar', 'revision', 'enviar antes', 'to do', 'tarea', 'solicitud'],\n};\n\nconst contiene = (texto, palabras) => palabras.find((p) => texto.includes(p));\n\nfunction extraerDireccion(remitente) {\n  const coincidencia = String(remitente || '').match(/<([^>]+)>/);\n  return normalizar(coincidencia ? coincidencia[1] : remitente).trim();\n}\n\nfunction clasificar(correo) {\n  const remitente = correo.From || correo.from?.text || correo.from || '';\n  const direccion = extraerDireccion(remitente);\n  const asunto = correo.Subject || correo.subject || '';\n  const texto = normalizar(`${asunto} ${correo.snippet || correo.text || ''}`);\n\n  let categoria = 'otros';\n  let motivo = 'No coincide con ninguna regla';\n  let palabra;\n\n  if (remitentesImportantes.some((r) => direccion.includes(r))) {\n    categoria = 'importante'; motivo = 'Remitente marcado como importante';\n  } else if ((palabra = contiene(texto, REGLAS.newsletter))) {\n    categoria = 'newsletter'; motivo = `Contiene \"${palabra}\"`;\n  } else if ((palabra = contiene(direccion, REGLAS.notificacionRemitente))) {\n    categoria = 'notificacion'; motivo = `Remitente automático (${palabra})`;\n  } else if ((palabra = contiene(texto, REGLAS.importante))) {\n    categoria = 'importante'; motivo = `Contiene \"${palabra}\"`;\n  } else if ((palabra = contiene(texto, REGLAS.notificacionAsunto))) {\n    categoria = 'notificacion'; motivo = `Contiene \"${palabra}\"`;\n  } else if ((palabra = contiene(texto, REGLAS.tarea))) {\n    categoria = 'tarea'; motivo = `Contiene \"${palabra}\"`;\n  }\n\n  return {\n    message_id: correo.id || '',\n    fecha_procesado: $now.toFormat('yyyy-MM-dd HH:mm'),\n    remitente: direccion,\n    asunto: String(asunto).slice(0, 200),\n    categoria,\n    motivo,\n  };\n}\n\nreturn $input.all()\n  .filter((item) => item.json && (item.json.id || item.json.Subject || item.json.subject))\n  .map((item) => ({ json: clasificar(item.json) }));"
+      },
+      "id": "d6706981-3225-5136-93c5-3ff98b6351fd",
+      "name": "Clasificar correo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "5ef8ebc1-e127-5a6a-b958-6d22719b7bcb",
+                    "leftValue": "={{ $json.categoria }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "importante"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "importante"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "4b82b135-f68c-5bba-a612-6b5f4e57d969",
+                    "leftValue": "={{ $json.categoria }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "tarea"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "tarea"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "6860a2fd-6064-5398-91b6-8a88e1d066ff",
+                    "leftValue": "={{ $json.categoria }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "notificacion"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "notificacion"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "faf09407-7c12-5450-bc1b-ffbed96f34c9",
+                    "leftValue": "={{ $json.categoria }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "newsletter"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "newsletter"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "otros"
+        }
+      },
+      "id": "11b56767-c7fb-5dd3-8c2d-473a2521ca5f",
+      "name": "Según categoría",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.5,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "9bc512f8-0ed6-5088-9a4d-9c6e5d0eca8f",
+      "name": "Categoría Importante",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        -240
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "49afcc52-8341-5371-b44d-a36132d95033",
+      "name": "Categoría Tarea",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        -120
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "670926c7-2073-5e82-9576-4bd8ffb6d1cf",
+      "name": "Categoría Notificación",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "8003db22-ec95-5635-af23-9efb4cf11e9e",
+      "name": "Categoría Newsletter",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        120
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "bb6f6a38-89c2-5a9b-9486-cc1095ad4f0f",
+      "name": "Categoría Otros",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        240
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Según categoría": {
+      "main": [
+        [
+          {
+            "node": "Categoría Importante",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Categoría Tarea",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Categoría Notificación",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Categoría Newsletter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Categoría Otros",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ejecutar manualmente": {
+      "main": [
+        [
+          {
+            "node": "Correos de ejemplo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Correos de ejemplo": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuración": {
+      "main": [
+        [
+          {
+            "node": "Clasificar correo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificar correo": {
+      "main": [
+        [
+          {
+            "node": "Según categoría",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
